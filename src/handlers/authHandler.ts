@@ -11,9 +11,9 @@ export class AuthHandler {
       logUserAction(ctx, 'start_registration');
       
       await ctx.reply(
-        '📝 *Регистрация в системе WLNX*\n\n' +
-        'Для начала работы с ботом необходимо зарегистрироваться в системе.\n\n' +
-        'Введите ваш email адрес:',
+        '📝 *WLNX Registration*\n\n' +
+        'To start using the bot, please register in the system.\n\n' +
+        'Enter your email address:',
         { parse_mode: 'Markdown' }
       );
       
@@ -27,14 +27,14 @@ export class AuthHandler {
       });
       
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при начале регистрации');
+      handleError(ctx, error, 'Error starting registration');
     }
   }
 
   static async handleEmailInput(ctx: Context, email: string): Promise<void> {
     try {
       if (!validateEmail(email)) {
-        await ctx.reply('❌ Неверный формат email. Попробуйте еще раз:');
+        await ctx.reply('❌ Invalid email format. Try again:');
         return;
       }
 
@@ -42,14 +42,14 @@ export class AuthHandler {
       userService.setUser(userInfo.id.toString(), { email });
       
       await ctx.reply(
-        '🔐 Теперь введите пароль:\n\n' +
-        '• Минимум 6 символов\n' +
-        '• Должен содержать строчные и заглавные буквы\n' +
-        '• Должен содержать хотя бы одну цифру'
+        '🔐 Now enter a password:\n\n' +
+        '• At least 6 characters\n' +
+        '• Must include lowercase and uppercase letters\n' +
+        '• Must include at least one number'
       );
       
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при обработке email');
+      handleError(ctx, error, 'Error processing email');
     }
   }
 
@@ -57,7 +57,7 @@ export class AuthHandler {
     try {
       const validation = validatePassword(password);
       if (!validation.valid) {
-        await ctx.reply(`❌ ${validation.message}\n\nПопробуйте еще раз:`);
+        await ctx.reply(`❌ ${validation.message}\n\nTry again:`);
         return;
       }
 
@@ -65,11 +65,11 @@ export class AuthHandler {
       const user = userService.getUser(userInfo.id.toString());
       
       if (!user?.email) {
-        await ctx.reply('❌ Ошибка: email не найден. Начните регистрацию заново с команды /register');
+        await ctx.reply('❌ Error: email not found. Start registration again with /register');
         return;
       }
 
-      await ctx.reply('⏳ Регистрируем вас в системе...');
+      await ctx.reply('⏳ Registering you in the system...');
 
       try {
         const authResponse = await apiService.registerUser(
@@ -87,14 +87,14 @@ export class AuthHandler {
         logUserAction(ctx, 'registration_success', { userId: authResponse.user.id });
 
         await ctx.reply(
-          '✅ *Регистрация успешно завершена!*\n\n' +
-          `Добро пожаловать, ${authResponse.user.name || authResponse.user.email}!\n\n` +
-          'Теперь вы можете использовать все функции бота.',
+          '✅ *Registration completed successfully!*\n\n' +
+          `Welcome, ${authResponse.user.name || authResponse.user.email}!\n\n` +
+          'You can now use all bot features.',
           { 
             parse_mode: 'Markdown',
             ...Markup.keyboard([
-              ['📊 Мои интервью', '📅 Календарь'],
-              ['⚙️ Настройки', '❓ Помощь']
+              ['📊 My Interviews', '📅 Calendar'],
+              ['⚙️ Settings', '❓ Help']
             ]).resize()
           }
         );
@@ -104,16 +104,16 @@ export class AuthHandler {
         
         if (apiError.status === 409) {
           await ctx.reply(
-            '❌ Пользователь с таким email уже существует.\n\n' +
-            'Попробуйте войти в систему с помощью команды /login'
+            '❌ A user with this email already exists.\n\n' +
+            'Try logging in using /login'
           );
         } else {
-          await ctx.reply('❌ Ошибка при регистрации. Попробуйте позже или обратитесь к администратору.');
+          await ctx.reply('❌ Registration error. Try again later or contact the administrator.');
         }
       }
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при обработке пароля');
+      handleError(ctx, error, 'Error processing password');
     }
   }
 
@@ -123,19 +123,19 @@ export class AuthHandler {
       logUserAction(ctx, 'start_login');
       
       await ctx.reply(
-        '🔑 *Вход в систему WLNX*\n\n' +
-        'Введите ваш email адрес:',
+        '🔑 *WLNX Login*\n\n' +
+        'Enter your email address:',
         { parse_mode: 'Markdown' }
       );
       
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при начале входа');
+      handleError(ctx, error, 'Error starting login');
     }
   }
 
   static async handleLoginPassword(ctx: Context, email: string, password: string): Promise<void> {
     try {
-      await ctx.reply('⏳ Выполняем вход...');
+      await ctx.reply('⏳ Logging you in...');
 
       const authResponse = await apiService.loginUser(email, password);
       const userInfo = getUserInfo(ctx);
@@ -156,13 +156,13 @@ export class AuthHandler {
       logUserAction(ctx, 'login_success', { userId: authResponse.user.id });
 
       await ctx.reply(
-        '✅ *Вход выполнен успешно!*\n\n' +
-        `Добро пожаловать, ${authResponse.user.name || authResponse.user.email}!`,
+        '✅ *Login successful!*\n\n' +
+        `Welcome, ${authResponse.user.name || authResponse.user.email}!`,
         { 
           parse_mode: 'Markdown',
           ...Markup.keyboard([
-            ['📊 Мои интервью', '📅 Календарь'],
-            ['⚙️ Настройки', '❓ Помощь']
+            ['📊 My Interviews', '📅 Calendar'],
+            ['⚙️ Settings', '❓ Help']
           ]).resize()
         }
       );
@@ -171,9 +171,9 @@ export class AuthHandler {
       logger.error('Login API error', apiError);
       
       if (apiError.status === 401) {
-        await ctx.reply('❌ Неверный email или пароль. Попробуйте еще раз.');
+        await ctx.reply('❌ Invalid email or password. Try again.');
       } else {
-        await ctx.reply('❌ Ошибка при входе. Попробуйте позже или обратитесь к администратору.');
+        await ctx.reply('❌ Login error. Try again later or contact the administrator.');
       }
     }
   }
@@ -184,7 +184,7 @@ export class AuthHandler {
       const userInfo = getUserInfo(ctx);
       
       if (!userService.isAuthenticated(userInfo.id.toString())) {
-        await ctx.reply('❌ Вы не авторизованы в системе.');
+        await ctx.reply('❌ You are not authenticated.');
         return;
       }
 
@@ -192,13 +192,13 @@ export class AuthHandler {
       logUserAction(ctx, 'logout');
 
       await ctx.reply(
-        '👋 Вы успешно вышли из системы.\n\n' +
-        'Для повторного входа используйте команду /login',
+        '👋 You have successfully logged out.\n\n' +
+        'To log in again, use /login',
         Markup.removeKeyboard()
       );
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при выходе');
+      handleError(ctx, error, 'Error during logout');
     }
   }
 
@@ -216,27 +216,27 @@ export class AuthHandler {
           try {
             const apiUser = await apiService.getCurrentUser(token);
             await ctx.reply(
-              '✅ *Вы авторизованы в системе*\n\n' +
-              `👤 Имя: ${apiUser.name || 'Не указано'}\n` +
+              '✅ *You are authenticated*\n\n' +
+              `👤 Name: ${apiUser.name || 'Not specified'}\n` +
               `📧 Email: ${apiUser.email}\n` +
               `🆔 ID: ${apiUser.id}\n` +
-              `📅 Регистрация: ${new Date(apiUser.created_at).toLocaleDateString('ru-RU')}`,
+              `📅 Registered: ${new Date(apiUser.created_at).toLocaleDateString('en-US')}`,
               { parse_mode: 'Markdown' }
             );
           } catch (apiError) {
-            await ctx.reply('❌ Ошибка при получении данных пользователя. Попробуйте войти заново.');
+            await ctx.reply('❌ Error fetching user data. Try logging in again.');
             userService.logout(userInfo.id.toString());
           }
         }
       } else {
         await ctx.reply(
-          '❌ Вы не авторизованы в системе.\n\n' +
-          'Используйте /login для входа или /register для регистрации.'
+          '❌ You are not authenticated.\n\n' +
+          'Use /login to sign in or /register to create an account.'
         );
       }
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при проверке авторизации');
+      handleError(ctx, error, 'Error checking authentication');
     }
   }
 }

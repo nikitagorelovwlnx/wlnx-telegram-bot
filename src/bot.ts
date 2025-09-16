@@ -40,194 +40,19 @@ export class TelegramBot {
   }
 
   private setupCommands(): void {
-    // Basic commands
+    // Only /start for initial setup - everything else is natural conversation
     this.bot.command('start', CommandHandler.start);
-    this.bot.command('help', CommandHandler.help);
-    this.bot.command('settings', CommandHandler.settings);
-    this.bot.command('profile', CommandHandler.profile);
-    this.bot.command('admin', CommandHandler.admin);
 
-    // Auth commands
-    this.bot.command('login', AuthHandler.startLogin);
-    this.bot.command('register', AuthHandler.startRegistration);
-    this.bot.command('logout', AuthHandler.logout);
-    this.bot.command('auth', AuthHandler.checkAuth);
-
-    // Interview commands
-    this.bot.command('interviews', InterviewHandler.showInterviews);
-    this.bot.command('add_interview', InterviewHandler.startAddInterview);
-    this.bot.command('stats', InterviewHandler.showStatistics);
-
-    // Wellness commands
-    this.bot.command('wellness', async (ctx) => {
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.showWellnessStatistics(ctx);
-    });
-    this.bot.command('wellness_start', async (ctx) => {
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.startWellnessInterview(ctx);
-    });
-
-    // Handle unknown commands
+    // All text messages are handled as natural conversation
     this.bot.on('text', CommandHandler.handleText);
   }
 
   private setupCallbacks(): void {
-    // Auth callbacks
-    this.bot.action('login', async (ctx) => {
+    // No callbacks needed - everything is natural conversation
+    // Only handle callback queries to prevent errors
+    this.bot.on('callback_query', async (ctx) => {
       await ctx.answerCbQuery();
-      await AuthHandler.startLogin(ctx);
-    });
-
-    this.bot.action('register', async (ctx) => {
-      await ctx.answerCbQuery();
-      await AuthHandler.startRegistration(ctx);
-    });
-
-    // Interview callbacks
-    this.bot.action('show_interviews', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.showInterviews(ctx);
-    });
-
-    this.bot.action('add_interview', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.startAddInterview(ctx);
-    });
-
-    this.bot.action('interview_stats', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.showStatistics(ctx);
-    });
-
-    // Interview result callbacks
-    this.bot.action('result_pending', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.handleResultSelection(ctx, 'pending');
-    });
-
-    this.bot.action('result_passed', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.handleResultSelection(ctx, 'passed');
-    });
-
-    this.bot.action('result_failed', async (ctx) => {
-      await ctx.answerCbQuery();
-      await InterviewHandler.handleResultSelection(ctx, 'failed');
-    });
-
-    // Skip callbacks
-    this.bot.action('skip_score', async (ctx) => {
-      await ctx.answerCbQuery();
-      await this.handleSkipToNotes(ctx);
-    });
-
-    this.bot.action('skip_notes', async (ctx) => {
-      await ctx.answerCbQuery();
-      await this.handleSkipNotes(ctx);
-    });
-
-    // Settings callbacks
-    this.bot.action('settings_notifications', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('🔔 Настройки уведомлений будут доступны в следующих версиях.');
-    });
-
-    this.bot.action('settings_calendar', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('📅 Настройки календаря будут доступны в следующих версиях.');
-    });
-
-    this.bot.action('settings_language', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('🌐 Настройки языка будут доступны в следующих версиях.');
-    });
-
-    this.bot.action('settings_security', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('🔐 Настройки безопасности будут доступны в следующих версиях.');
-    });
-
-    // Admin callbacks
-    this.bot.action('admin_stats', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('📊 Детальная статистика будет доступна в следующих версиях.');
-    });
-
-    this.bot.action('admin_users', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('👥 Управление пользователями будет доступно в следующих версиях.');
-    });
-
-    this.bot.action('admin_broadcast', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('📢 Функция рассылки будет доступна в следующих версиях.');
-    });
-
-    this.bot.action('admin_system', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply('🔧 Системные настройки будут доступны в следующих версиях.');
-    });
-
-    // Help callback
-    this.bot.action('help', async (ctx) => {
-      await ctx.answerCbQuery();
-      await CommandHandler.help(ctx);
-    });
-
-    // Wellness callbacks
-    this.bot.action('start_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.startWellnessInterview(ctx);
-    });
-
-    this.bot.action('skip_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      await ctx.reply(
-        '⏭️ Wellness-интервью пропущено.\n\n' +
-        'Вы можете пройти его в любое время через команду /wellness_start',
-        Markup.keyboard([
-          ['📊 Мои интервью', '🌿 Wellness'],
-          ['📅 Календарь', '⚙️ Настройки'],
-          ['❓ Помощь']
-        ]).resize()
-      );
-    });
-
-    this.bot.action('complete_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.completeWellnessInterview(ctx);
-    });
-
-    this.bot.action('wellness_stats', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.showWellnessStatistics(ctx);
-    });
-
-    this.bot.action('restart_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.restartWellnessInterview(ctx);
-    });
-
-    this.bot.action('confirm_restart_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.startWellnessInterview(ctx);
-    });
-
-    this.bot.action('cancel_restart_wellness', async (ctx) => {
-      await ctx.answerCbQuery();
-      const { WellnessHandler } = await import('./handlers/wellnessHandler');
-      await WellnessHandler.showWellnessStatistics(ctx);
-    });
-
-    this.bot.action('main_menu', async (ctx) => {
-      await ctx.answerCbQuery();
-      await CommandHandler.start(ctx);
+      await ctx.reply('Just text me what you want to talk about! 😊');
     });
   }
 
@@ -245,9 +70,9 @@ export class TelegramBot {
         userService.setUser(userInfo.id.toString(), { interviewData });
         
         await ctx.reply(
-          '📝 Добавьте заметки об интервью (или пропустите, отправив "-"):',
+          '📝 Add interview notes (or skip by sending "-"):',
           Markup.inlineKeyboard([
-            [Markup.button.callback('Пропустить', 'skip_notes')]
+            [Markup.button.callback('Skip', 'skip_notes')]
           ])
         );
       }
@@ -290,13 +115,13 @@ export class TelegramBot {
         const { formatInterviewResult } = await import('./utils/helpers');
         
         await ctx.reply(
-          '✅ *Интервью успешно сохранено!*\n\n' +
+          '✅ *Interview successfully saved!*\n\n' +
           formatInterviewResult(savedInterview),
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('📊 Мои интервью', 'show_interviews')],
-              [Markup.button.callback('➕ Добавить еще', 'add_interview')]
+              [Markup.button.callback('📊 My Interviews', 'show_interviews')],
+              [Markup.button.callback('➕ Add Another', 'add_interview')]
             ])
           }
         );
