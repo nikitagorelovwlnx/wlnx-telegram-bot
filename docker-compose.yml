@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  wlnx-telegram-bot:
+    build: .
+    container_name: wlnx-telegram-bot
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
+    ports:
+      - "${WEBHOOK_PORT:-8080}:8080"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - wlnx-api-server
+    networks:
+      - wlnx-network
+
+  # If you want to run the API server alongside the bot
+  wlnx-api-server:
+    image: wlnx-api-server:latest  # Replace with actual image
+    container_name: wlnx-api-server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    networks:
+      - wlnx-network
+
+networks:
+  wlnx-network:
+    driver: bridge
