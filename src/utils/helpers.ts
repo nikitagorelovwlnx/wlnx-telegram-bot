@@ -8,7 +8,7 @@ export function isAdmin(userId: number): boolean {
 
 export function formatDate(date: string | Date): string {
   const d = new Date(date);
-  return d.toLocaleDateString('ru-RU', {
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -45,7 +45,7 @@ export function logUserAction(ctx: Context, action: string, details?: any): void
   });
 }
 
-export function handleError(ctx: Context, error: any, userMessage: string = 'Произошла ошибка. Попробуйте позже.'): void {
+export function handleError(ctx: Context, error: any, userMessage: string = 'Something went wrong. Please try again later.'): void {
   const userInfo = getUserInfo(ctx);
   logger.error('Bot error', {
     userId: userInfo.id,
@@ -66,13 +66,13 @@ export function validateEmail(email: string): boolean {
 
 export function validatePassword(password: string): { valid: boolean; message?: string } {
   if (password.length < 6) {
-    return { valid: false, message: 'Пароль должен содержать минимум 6 символов' };
+    return { valid: false, message: 'Password must be at least 6 characters long' };
   }
   
   if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
     return { 
       valid: false, 
-      message: 'Пароль должен содержать хотя бы одну строчную букву, одну заглавную букву и одну цифру' 
+      message: 'Password must include at least one lowercase letter, one uppercase letter, and one number' 
     };
   }
   
@@ -88,9 +88,9 @@ export function formatInterviewResult(result: any): string {
 
   const status = statusEmoji[result.result as keyof typeof statusEmoji] || '❓';
   
-  return `${status} *${escapeMarkdown(result.position)}* в *${escapeMarkdown(result.company)}*
-📅 Дата: ${formatDate(result.interview_date)}
-📊 Результат: ${result.result === 'pending' ? 'Ожидание' : result.result === 'passed' ? 'Пройдено' : 'Не пройдено'}
-${result.score ? `⭐ Оценка: ${result.score}/10` : ''}
-${result.notes ? `📝 Заметки: ${escapeMarkdown(result.notes)}` : ''}`;
+  return `${status} *${escapeMarkdown(result.position)}* at *${escapeMarkdown(result.company)}*
+📅 Date: ${formatDate(result.interview_date)}
+📊 Result: ${result.result === 'pending' ? 'Pending' : result.result === 'passed' ? 'Passed' : 'Failed'}
+${result.score ? `⭐ Score: ${result.score}/10` : ''}
+${result.notes ? `📝 Notes: ${escapeMarkdown(result.notes)}` : ''}`;
 }

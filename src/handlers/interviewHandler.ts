@@ -12,22 +12,22 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token) {
-        await ctx.reply('❌ Вы не авторизованы. Используйте /login для входа.');
+        await ctx.reply('❌ You are not authorized. Use /login to sign in.');
         return;
       }
 
       logUserAction(ctx, 'show_interviews');
 
-      await ctx.reply('⏳ Загружаю ваши интервью...');
+      await ctx.reply('⏳ Loading your interviews...');
 
       const interviews = await apiService.getInterviewResults(token);
 
       if (interviews.length === 0) {
         await ctx.reply(
-          '📝 У вас пока нет записей об интервью.\n\n' +
-          'Используйте команду /add_interview для добавления нового интервью.',
+          '📝 You don\'t have any interview records yet.\n\n' +
+          'Use the /add_interview command to add a new interview.',
           Markup.inlineKeyboard([
-            [Markup.button.callback('➕ Добавить интервью', 'add_interview')]
+            [Markup.button.callback('➕ Add Interview', 'add_interview')]
           ])
         );
         return;
@@ -36,26 +36,26 @@ export class InterviewHandler {
       // Sort interviews by date (newest first)
       interviews.sort((a, b) => new Date(b.interview_date).getTime() - new Date(a.interview_date).getTime());
 
-      let message = `📊 *Ваши интервью (${interviews.length})*\n\n`;
+      let message = `📊 *Your Interviews (${interviews.length})*\n\n`;
 
       interviews.slice(0, 10).forEach((interview, index) => {
         message += `${index + 1}. ${formatInterviewResult(interview)}\n\n`;
       });
 
       if (interviews.length > 10) {
-        message += `... и еще ${interviews.length - 10} интервью`;
+        message += `... and ${interviews.length - 10} more interviews`;
       }
 
       await ctx.reply(message, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Добавить интервью', 'add_interview')],
-          [Markup.button.callback('📈 Статистика', 'interview_stats')]
+          [Markup.button.callback('➕ Add Interview', 'add_interview')],
+          [Markup.button.callback('📈 Statistics', 'interview_stats')]
         ])
       });
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при загрузке интервью');
+      handleError(ctx, error, 'Error loading interviews');
     }
   }
 
@@ -66,15 +66,15 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token) {
-        await ctx.reply('❌ Вы не авторизованы. Используйте /login для входа.');
+        await ctx.reply('❌ You are not authorized. Use /login to sign in.');
         return;
       }
 
       logUserAction(ctx, 'start_add_interview');
 
       await ctx.reply(
-        '📝 *Добавление нового интервью*\n\n' +
-        'Введите название позиции (например: "Frontend Developer"):',
+        '📝 *Adding New Interview*\n\n' +
+        'Enter the position title (e.g., "Frontend Developer"):',
         { parse_mode: 'Markdown' }
       );
 
@@ -84,7 +84,7 @@ export class InterviewHandler {
       });
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при начале добавления интервью');
+      handleError(ctx, error, 'Error starting interview addition');
     }
   }
 
@@ -96,7 +96,7 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token || !user?.interviewData) {
-        await ctx.reply('❌ Ошибка состояния. Начните добавление интервью заново с команды /add_interview');
+        await ctx.reply('❌ State error. Start adding interview again with /add_interview command');
         return;
       }
 
@@ -109,7 +109,7 @@ export class InterviewHandler {
           interviewData.step = 'company';
           userService.setUser(userInfo.id.toString(), { interviewData });
           
-          await ctx.reply('🏢 Теперь введите название компании:');
+          await ctx.reply('🏢 Now enter the company name:');
           break;
 
         case 'company':
@@ -118,15 +118,15 @@ export class InterviewHandler {
           userService.setUser(userInfo.id.toString(), { interviewData });
           
           await ctx.reply(
-            '📅 Введите дату интервью в формате ДД.ММ.ГГГГ или ДД.ММ.ГГГГ ЧЧ:ММ\n' +
-            'Например: 15.12.2023 или 15.12.2023 14:30'
+            '📅 Enter the interview date in DD.MM.YYYY or DD.MM.YYYY HH:MM format\n' +
+            'For example: 15.12.2023 or 15.12.2023 14:30'
           );
           break;
 
         case 'date':
           const parsedDate = this.parseDate(text);
           if (!parsedDate) {
-            await ctx.reply('❌ Неверный формат даты. Попробуйте еще раз (например: 15.12.2023 14:30):');
+            await ctx.reply('❌ Invalid date format. Try again (e.g., 15.12.2023 14:30):');
             return;
           }
           
@@ -135,11 +135,11 @@ export class InterviewHandler {
           userService.setUser(userInfo.id.toString(), { interviewData });
           
           await ctx.reply(
-            '📊 Выберите результат интервью:',
+            '📊 Select interview result:',
             Markup.inlineKeyboard([
-              [Markup.button.callback('⏳ Ожидание', 'result_pending')],
-              [Markup.button.callback('✅ Пройдено', 'result_passed')],
-              [Markup.button.callback('❌ Не пройдено', 'result_failed')]
+              [Markup.button.callback('⏳ Pending', 'result_pending')],
+              [Markup.button.callback('✅ Passed', 'result_passed')],
+              [Markup.button.callback('❌ Failed', 'result_failed')]
             ])
           );
           break;
@@ -150,11 +150,11 @@ export class InterviewHandler {
           break;
 
         default:
-          await ctx.reply('❌ Неизвестное состояние. Начните заново с команды /add_interview');
+          await ctx.reply('❌ Unknown state. Start over with /add_interview command');
       }
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при обработке данных интервью');
+      handleError(ctx, error, 'Error processing interview data');
     }
   }
 
@@ -166,7 +166,7 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token || !user?.interviewData) {
-        await ctx.reply('❌ Ошибка состояния. Начните добавление интервью заново.');
+        await ctx.reply('❌ State error. Start adding interview again.');
         return;
       }
 
@@ -178,9 +178,9 @@ export class InterviewHandler {
         userService.setUser(userInfo.id.toString(), { interviewData });
         
         await ctx.reply(
-          '⭐ Введите оценку от 1 до 10 (или пропустите, отправив "-"):',
+          '⭐ Enter a score from 1 to 10 (or skip by sending "-"):',
           Markup.inlineKeyboard([
-            [Markup.button.callback('Пропустить', 'skip_score')]
+            [Markup.button.callback('Skip', 'skip_score')]
           ])
         );
       } else {
@@ -188,15 +188,15 @@ export class InterviewHandler {
         userService.setUser(userInfo.id.toString(), { interviewData });
         
         await ctx.reply(
-          '📝 Добавьте заметки об интервью (или пропустите, отправив "-"):',
+          '📝 Add interview notes (or skip by sending "-"):',
           Markup.inlineKeyboard([
-            [Markup.button.callback('Пропустить', 'skip_notes')]
+            [Markup.button.callback('Skip', 'skip_notes')]
           ])
         );
       }
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при выборе результата');
+      handleError(ctx, error, 'Error selecting result');
     }
   }
 
@@ -208,7 +208,7 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token || !user?.interviewData) {
-        await ctx.reply('❌ Ошибка состояния. Начните добавление интервью заново.');
+        await ctx.reply('❌ State error. Start adding interview again with /add_interview command');
         return;
       }
 
@@ -217,7 +217,7 @@ export class InterviewHandler {
       if (text !== '-') {
         const score = parseInt(text);
         if (isNaN(score) || score < 1 || score > 10) {
-          await ctx.reply('❌ Оценка должна быть числом от 1 до 10. Попробуйте еще раз:');
+          await ctx.reply('❌ Score must be a number from 1 to 10. Try again:');
           return;
         }
         interviewData.score = score;
@@ -227,21 +227,21 @@ export class InterviewHandler {
       userService.setUser(userInfo.id.toString(), { interviewData });
 
       await ctx.reply(
-        '📝 Добавьте заметки об интервью (или пропустите, отправив "-"):',
+        '📝 Add interview notes (or skip by sending "-"):',
         Markup.inlineKeyboard([
-          [Markup.button.callback('Пропустить', 'skip_notes')]
+          [Markup.button.callback('Skip', 'skip_notes')]
         ])
       );
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при обработке оценки');
+      handleError(ctx, error, 'Error processing score');
     }
   }
 
   // Save interview to API
   private static async saveInterview(ctx: Context, interviewData: any, token: string): Promise<void> {
     try {
-      await ctx.reply('⏳ Сохраняю интервью...');
+      await ctx.reply('⏳ Saving interview...');
 
       const interview: Omit<InterviewResult, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
         position: interviewData.position,
@@ -261,19 +261,19 @@ export class InterviewHandler {
       logUserAction(ctx, 'interview_saved', { interviewId: savedInterview.id });
 
       await ctx.reply(
-        '✅ *Интервью успешно сохранено!*\n\n' +
+        '✅ *Interview successfully saved!*\n\n' +
         formatInterviewResult(savedInterview),
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('📊 Мои интервью', 'show_interviews')],
-            [Markup.button.callback('➕ Добавить еще', 'add_interview')]
+            [Markup.button.callback('📊 My Interviews', 'show_interviews')],
+            [Markup.button.callback('➕ Add Another', 'add_interview')]
           ])
         }
       );
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при сохранении интервью');
+      handleError(ctx, error, 'Error saving interview');
     }
   }
 
@@ -291,7 +291,7 @@ export class InterviewHandler {
       const interviews = await apiService.getInterviewResults(token);
 
       if (interviews.length === 0) {
-        await ctx.reply('📊 Нет данных для статистики. Добавьте интервью с помощью /add_interview');
+        await ctx.reply('📊 No data for statistics. Add interviews using /add_interview');
         return;
       }
 
@@ -309,27 +309,27 @@ export class InterviewHandler {
       const companies = [...new Set(interviews.map(i => i.company))];
       const positions = [...new Set(interviews.map(i => i.position))];
 
-      let message = `📈 *Статистика интервью*\n\n`;
-      message += `📊 Всего интервью: ${total}\n`;
-      message += `✅ Пройдено: ${passed}\n`;
-      message += `❌ Не пройдено: ${failed}\n`;
-      message += `⏳ Ожидание: ${pending}\n\n`;
+      let message = `📈 *Interview Statistics*\n\n`;
+      message += `📊 Total interviews: ${total}\n`;
+      message += `✅ Passed: ${passed}\n`;
+      message += `❌ Failed: ${failed}\n`;
+      message += `⏳ Pending: ${pending}\n\n`;
       
       if (passed + failed > 0) {
-        message += `🎯 Процент успеха: ${passRate}%\n`;
+        message += `🎯 Success rate: ${passRate}%\n`;
       }
       
       if (averageScore) {
-        message += `⭐ Средняя оценка: ${averageScore.toFixed(1)}/10\n`;
+        message += `⭐ Average score: ${averageScore.toFixed(1)}/10\n`;
       }
       
-      message += `\n🏢 Компаний: ${companies.length}\n`;
-      message += `💼 Позиций: ${positions.length}`;
+      message += `\n🏢 Companies: ${companies.length}\n`;
+      message += `💼 Positions: ${positions.length}`;
 
       await ctx.reply(message, { parse_mode: 'Markdown' });
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при загрузке статистики');
+      handleError(ctx, error, 'Error loading statistics');
     }
   }
 
