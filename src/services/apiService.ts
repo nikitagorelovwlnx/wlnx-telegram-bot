@@ -195,45 +195,46 @@ class ApiService {
     });
   }
 
-  // Wellness Interview endpoints
+  // Wellness Interview endpoints (email-based, no auth required)
   async createWellnessInterview(
-    token: string,
+    email: string,
     interviewData: Omit<WellnessInterview, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', interviewData, {
-      headers: { Authorization: `Bearer ${token}` },
+    const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', {
+      email,
+      ...interviewData
     });
     return response.data;
   }
 
-  async getWellnessInterviews(token: string): Promise<WellnessInterview[]> {
-    const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/interviews', {
-      headers: { Authorization: `Bearer ${token}` },
+  async getWellnessInterviews(email: string): Promise<WellnessInterview[]> {
+    const response: AxiosResponse<{ results: WellnessInterview[] }> = await this.api.get('/interviews', {
+      params: { email }
     });
-    return response.data;
+    return response.data.results;
   }
 
   async updateWellnessInterview(
-    token: string,
+    email: string,
     id: string,
     interviewData: Partial<WellnessInterview>
   ): Promise<WellnessInterview> {
     const response: AxiosResponse<WellnessInterview> = await this.api.put(`/interviews/${id}`, interviewData, {
-      headers: { Authorization: `Bearer ${token}` },
+      params: { email }
     });
     return response.data;
   }
 
-  async getWellnessInterview(token: string, id: string): Promise<WellnessInterview> {
+  async getWellnessInterview(email: string, id: string): Promise<WellnessInterview> {
     const response: AxiosResponse<WellnessInterview> = await this.api.get(`/interviews/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      params: { email }
     });
     return response.data;
   }
 
-  async deleteWellnessInterview(token: string, id: string): Promise<void> {
+  async deleteWellnessInterview(email: string, id: string): Promise<void> {
     await this.api.delete(`/interviews/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      params: { email }
     });
   }
 }

@@ -261,9 +261,8 @@ export class CommandHandler {
         return;
       }
 
-      const token = userService.getApiToken(userInfo.id.toString());
-      if (!token) {
-        await ctx.reply('❌ Нет токена авторизации. Попробуйте перелогиниться.');
+      if (!user.email) {
+        await ctx.reply('❌ Email не найден. Зарегистрируйтесь заново с помощью /start.');
         return;
       }
 
@@ -281,19 +280,19 @@ export class CommandHandler {
           .join('\n\n');
         
         // Check if wellness interview exists for this user
-        const interviews = await apiService.getWellnessInterviews(token);
+        const interviews = await apiService.getWellnessInterviews(user.email);
         let currentInterview = interviews.length > 0 ? interviews[0] : null;
         
         if (!currentInterview) {
           // Create new wellness interview
-          currentInterview = await apiService.createWellnessInterview(token, {
+          currentInterview = await apiService.createWellnessInterview(user.email, {
             transcription: transcription,
             summary: wellnessSummary
           });
           await ctx.reply('✅ Новое интервью создано и сохранено на сервере!');
         } else {
           // Update existing interview
-          await apiService.updateWellnessInterview(token, currentInterview.id, {
+          await apiService.updateWellnessInterview(user.email, currentInterview.id, {
             transcription: transcription,
             summary: wellnessSummary
           });
@@ -364,47 +363,44 @@ export class CommandHandler {
       });
 
       // Save to API with transcription and AI-generated summary
-      if (conversationHistory.length >= 6) { // Save after meaningful conversation
+      if (conversationHistory.length >= 6 && user?.email) { // Save after meaningful conversation
         try {
-          const token = userService.getApiToken(userInfo.id.toString());
-          if (token) {
-            const { apiService } = await import('../services/apiService');
+          const { apiService } = await import('../services/apiService');
+          
+          // Generate comprehensive wellness summary
+          const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+          
+          // Create transcription from conversation history
+          const transcription = conversationHistory
+            .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
+            .join('\n\n');
+          
+          // Check if wellness interview exists for this user
+          const interviews = await apiService.getWellnessInterviews(user.email);
+          let currentInterview = interviews.length > 0 ? interviews[0] : null;
+          
+          if (!currentInterview) {
+            // Create new wellness interview
+            currentInterview = await apiService.createWellnessInterview(user.email, {
+              transcription: transcription,
+              summary: wellnessSummary
+            });
             
-            // Generate comprehensive wellness summary
-            const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+            // Notify user about auto-save
+            setTimeout(() => {
+              ctx.reply('💾 Интервью автоматически сохранено на сервер! (Можно также использовать /save_interview для ручного сохранения)');
+            }, 2000);
+          } else {
+            // Update existing interview
+            await apiService.updateWellnessInterview(user.email, currentInterview.id, {
+              transcription: transcription,
+              summary: wellnessSummary
+            });
             
-            // Create transcription from conversation history
-            const transcription = conversationHistory
-              .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
-              .join('\n\n');
-            
-            // Check if wellness interview exists for this user
-            const interviews = await apiService.getWellnessInterviews(token);
-            let currentInterview = interviews.length > 0 ? interviews[0] : null;
-            
-            if (!currentInterview) {
-              // Create new wellness interview
-              currentInterview = await apiService.createWellnessInterview(token, {
-                transcription: transcription,
-                summary: wellnessSummary
-              });
-              
-              // Notify user about auto-save
-              setTimeout(() => {
-                ctx.reply('💾 Интервью автоматически сохранено на сервер! (Можно также использовать /save_interview для ручного сохранения)');
-              }, 2000);
-            } else {
-              // Update existing interview
-              await apiService.updateWellnessInterview(token, currentInterview.id, {
-                transcription: transcription,
-                summary: wellnessSummary
-              });
-              
-              // Notify user about auto-update
-              setTimeout(() => {
-                ctx.reply('💾 Интервью обновлено на сервере!');
-              }, 2000);
-            }
+            // Notify user about auto-update
+            setTimeout(() => {
+              ctx.reply('💾 Интервью обновлено на сервере!');
+            }, 2000);
           }
         } catch (apiError) {
           // Don't break conversation if API fails
