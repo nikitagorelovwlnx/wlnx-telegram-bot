@@ -40,8 +40,11 @@ export class TelegramBot {
   }
 
   private setupCommands(): void {
-    // Only /start for initial setup - everything else is natural conversation
+    // Main commands
     this.bot.command('start', CommandHandler.start);
+    this.bot.command('save_interview', CommandHandler.saveConversation);
+    this.bot.command('help', CommandHandler.help);
+    this.bot.command('settings', CommandHandler.settings);
 
     // All text messages are handled as natural conversation
     this.bot.on('text', CommandHandler.handleText);
