@@ -213,21 +213,21 @@ class ApiService {
       summaryLength: requestData.summary?.length || 0,
       transcriptionPreview: requestData.transcription?.substring(0, 100) + '...',
       summaryPreview: requestData.summary?.substring(0, 100) + '...',
-      url: '/interviews',
+      url: '/api/interviews',
       method: 'POST'
     });
     
     console.log('Full request data:', JSON.stringify(requestData, null, 2));
     
-    const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', requestData);
+    const response: AxiosResponse<WellnessInterview> = await this.api.post('/api/interviews', requestData);
     return response.data;
   }
 
   async getWellnessInterviews(email: string): Promise<WellnessInterview[]> {
-    const response: AxiosResponse<{ results: WellnessInterview[] }> = await this.api.get('/interviews', {
+    const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/api/interviews', {
       params: { email }
     });
-    return response.data.results;
+    return response.data;
   }
 
   async updateWellnessInterview(
@@ -235,23 +235,30 @@ class ApiService {
     id: string,
     interviewData: Partial<WellnessInterview>
   ): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.put(`/interviews/${id}`, interviewData, {
-      params: { email }
+    const response: AxiosResponse<WellnessInterview> = await this.api.put(`/api/interviews/${id}`, {
+      email,
+      ...interviewData
     });
     return response.data;
   }
 
   async getWellnessInterview(email: string, id: string): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.get(`/interviews/${id}`, {
+    const response: AxiosResponse<WellnessInterview> = await this.api.get(`/api/interviews/${id}`, {
       params: { email }
     });
     return response.data;
   }
 
   async deleteWellnessInterview(email: string, id: string): Promise<void> {
-    await this.api.delete(`/interviews/${id}`, {
-      params: { email }
+    await this.api.delete(`/api/interviews/${id}`, {
+      data: { email }
     });
+  }
+
+  // New endpoint: Get all users with complete session history
+  async getAllUsersWithSessions(): Promise<any> {
+    const response: AxiosResponse<any> = await this.api.get('/api/users');
+    return response.data;
   }
 }
 

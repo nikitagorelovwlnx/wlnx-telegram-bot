@@ -293,9 +293,9 @@ class ConversationService {
 
     // Extract biometrics and habits
     const sleepPatterns = [
-      /sleep (\d+)\s*hours?/i,
-      /(\d+)\s*hours?\s*sleep/i,
-      /get (\d+)\s*hours?/i
+      /sleep\s*(?:about|around)?\s*(\d+)\s*hours?/i,
+      /(\d+)\s*hours?\s*(?:of\s*)?sleep/i,
+      /get\s*(?:about|around)?\s*(\d+)\s*hours?/i
     ];
     for (const pattern of sleepPatterns) {
       const match = allText.match(pattern);
@@ -382,7 +382,7 @@ class ConversationService {
     // Extract goals, interests, and preferences
     const goalKeywords = [
       'lose weight', 'gain muscle', 'get fit', 'improve health', 'reduce stress',
-      'sleep better', 'more energy', 'feel better', 'get stronger', 'lose fat',
+      'sleep better', 'improve sleep', 'more energy', 'feel better', 'get stronger', 'lose fat',
       'work-life balance', 'boost productivity', 'manage stress'
     ];
 

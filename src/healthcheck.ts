@@ -167,7 +167,7 @@ class HealthCheckService {
     const startTime = Date.now();
     
     try {
-      // Simple check if API service is configured
+      // Check if API service is configured
       const hasBaseUrl = !!config.apiBaseUrl;
       
       if (!hasBaseUrl) {
@@ -177,12 +177,31 @@ class HealthCheckService {
         };
       }
 
-      const responseTime = Date.now() - startTime;
-      
-      return {
-        status: 'up',
-        responseTime
-      };
+      // Try to make a simple health check request to API server
+      try {
+        const response = await fetch(`${config.apiBaseUrl}/health`);
+        const responseTime = Date.now() - startTime;
+        
+        if (response.ok) {
+          return {
+            status: 'up',
+            responseTime
+          };
+        } else {
+          return {
+            status: 'down',
+            responseTime,
+            error: `API health check failed: ${response.status}`
+          };
+        }
+      } catch (fetchError) {
+        const responseTime = Date.now() - startTime;
+        return {
+          status: 'down',
+          responseTime,
+          error: 'API server unreachable'
+        };
+      }
     } catch (error) {
       return {
         status: 'down',

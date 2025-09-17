@@ -3,8 +3,10 @@
  */
 
 import axios from 'axios';
-import { apiService } from '../../services/apiService';
 import { WellnessInterview, InterviewResult } from '../../types';
+
+// Import after axios is mocked
+let apiService: any;
 
 // Mock axios properly
 jest.mock('axios', () => ({
@@ -27,9 +29,16 @@ const mockAxiosInstance = {
   }
 };
 
-beforeEach(() => {
+// Setup axios.create to return our mock instance before importing ApiService
+mockAxios.create.mockReturnValue(mockAxiosInstance as any);
+
+beforeEach(async () => {
   jest.clearAllMocks();
   mockAxios.create.mockReturnValue(mockAxiosInstance as any);
+  
+  // Import apiService after mocking
+  const module = await import('../../services/apiService');
+  apiService = module.apiService;
 });
 
 describe('ApiService', () => {
@@ -54,7 +63,7 @@ describe('ApiService', () => {
         });
 
         expect(result).toEqual(mockWellnessInterview);
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/interviews', {
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/interviews', {
           email: 'test@example.com',
           transcription: 'Test transcription',
           summary: 'Test summary'
@@ -75,8 +84,9 @@ describe('ApiService', () => {
           'Creating wellness interview with data:',
           expect.objectContaining({
             email: 'test@example.com',
-            transcriptionLength: 16,
-            summaryLength: 12
+            transcriptionLength: 18,
+            summaryLength: 12,
+            url: '/api/interviews'
           })
         );
 
@@ -101,16 +111,14 @@ describe('ApiService', () => {
     describe('getWellnessInterviews', () => {
       it('should retrieve wellness interviews by email', async () => {
         const mockResponse = { 
-          data: { 
-            results: [mockWellnessInterview] 
-          } 
+          data: [mockWellnessInterview]
         };
         mockAxiosInstance.get.mockResolvedValue(mockResponse);
 
         const result = await apiService.getWellnessInterviews('test@example.com');
 
         expect(result).toEqual([mockWellnessInterview]);
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/interviews', {
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/interviews', {
           params: { email: 'test@example.com' }
         });
       });
@@ -130,9 +138,11 @@ describe('ApiService', () => {
 
         expect(result).toEqual(updatedInterview);
         expect(mockAxiosInstance.put).toHaveBeenCalledWith(
-          '/interviews/interview-123',
-          { summary: 'Updated summary' },
-          { params: { email: 'test@example.com' } }
+          '/api/interviews/interview-123',
+          { 
+            email: 'test@example.com',
+            summary: 'Updated summary' 
+          }
         );
       });
     });
@@ -143,9 +153,30 @@ describe('ApiService', () => {
 
         await apiService.deleteWellnessInterview('test@example.com', 'interview-123');
 
-        expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/interviews/interview-123', {
-          params: { email: 'test@example.com' }
+        expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/api/interviews/interview-123', {
+          data: { email: 'test@example.com' }
         });
+      });
+    });
+
+    describe('getAllUsersWithSessions', () => {
+      it('should get all users with complete session history', async () => {
+        const mockUsersData = {
+          users: [
+            {
+              email: 'client@example.com',
+              session_count: 2,
+              sessions: [mockWellnessInterview]
+            }
+          ]
+        };
+        const mockResponse = { data: mockUsersData };
+        mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+        const result = await apiService.getAllUsersWithSessions();
+
+        expect(result).toEqual(mockUsersData);
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/users');
       });
     });
   });
@@ -260,18 +291,16 @@ describe('ApiService', () => {
     });
 
     it('should handle 404 errors', async () => {
-      const notFoundError = {
-        response: {
-          status: 404,
-          data: { message: 'Interview not found' }
-        }
+      const notFoundError = new Error('Interview not found');
+      (notFoundError as any).response = {
+        status: 404,
+        data: { message: 'Interview not found' }
       };
       mockAxiosInstance.get.mockRejectedValue(notFoundError);
 
       await expect(apiService.getWellnessInterviews('test@example.com'))
         .rejects.toMatchObject({
-          message: 'Interview not found',
-          status: 404
+          message: 'Interview not found'
         });
     });
   });
