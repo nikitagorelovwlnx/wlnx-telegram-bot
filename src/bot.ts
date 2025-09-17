@@ -147,6 +147,10 @@ export class TelegramBot {
 
   async start(): Promise<void> {
     try {
+      // Start health check server first
+      logger.info('Starting health check server...');
+      await healthCheckService.start(3002);
+
       if (isDevelopment) {
         // Use polling in development
         logger.info('Starting bot in polling mode...');
