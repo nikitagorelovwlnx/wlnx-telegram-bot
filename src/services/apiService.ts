@@ -200,10 +200,20 @@ class ApiService {
     email: string,
     interviewData: Omit<WellnessInterview, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', {
+    const requestData = {
       email,
-      ...interviewData
+      transcription: interviewData.transcription,
+      summary: interviewData.summary
+    };
+    
+    // Debug logging
+    console.log('Creating wellness interview with data:', {
+      email: requestData.email,
+      transcriptionLength: requestData.transcription?.length || 0,
+      summaryLength: requestData.summary?.length || 0
     });
+    
+    const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', requestData);
     return response.data;
   }
 

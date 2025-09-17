@@ -306,12 +306,30 @@ export class CommandHandler {
         });
 
       } catch (apiError: any) {
-        logger.error('Failed to save conversation to API', apiError);
-        await ctx.reply(
-          '❌ Ошибка при сохранении на сервер:\n' +
-          `${apiError.message || 'Неизвестная ошибка'}\n\n` +
-          'Попробуйте позже или проверьте подключение к серверу.'
-        );
+        logger.error('Failed to save conversation to API', {
+          error: apiError,
+          email: user.email,
+          conversationLength: conversationHistory.length,
+          errorStatus: apiError.status,
+          errorResponse: apiError.response?.data
+        });
+        
+        let errorMessage = '❌ Ошибка при сохранении на сервер:\n';
+        
+        if (apiError.status === 400) {
+          errorMessage += 'Неверный формат данных.\n';
+          if (apiError.response?.data?.error) {
+            errorMessage += `Детали: ${apiError.response.data.error}\n`;
+          }
+        } else if (apiError.code === 'ECONNREFUSED') {
+          errorMessage += 'API сервер недоступен. Проверьте, что сервер запущен на http://localhost:3000\n';
+        } else {
+          errorMessage += `${apiError.message || 'Неизвестная ошибка'}\n`;
+        }
+        
+        errorMessage += '\nПопробуйте позже или проверьте подключение к серверу.';
+        
+        await ctx.reply(errorMessage);
       }
 
     } catch (error) {
@@ -402,9 +420,15 @@ export class CommandHandler {
               ctx.reply('💾 Интервью обновлено на сервере!');
             }, 2000);
           }
-        } catch (apiError) {
+        } catch (apiError: any) {
           // Don't break conversation if API fails
-          logger.error('Failed to save conversation to API', apiError);
+          logger.error('Failed to save conversation to API', {
+            error: apiError,
+            email: user?.email,
+            conversationLength: conversationHistory.length,
+            errorStatus: apiError.status,
+            errorResponse: apiError.response?.data
+          });
         }
       }
 
@@ -450,71 +474,23 @@ export class CommandHandler {
             return;
           }
           
+          // Complete registration - just save name and email, no password needed
           userService.setUser(userInfo.id.toString(), {
             email: text,
-            registrationStep: 'password'
+            isAuthenticated: true,
+            registrationStep: undefined
           });
-          
+
           await ctx.reply(
-            'Great! Now create a password (minimum 6 characters)'
+            `Perfect! Now we know each other 🎉\n\n` +
+            'Tell me, how are you doing? What\'s bothering you or what interests you?'
           );
-          break;
 
-        case 'password':
-          if (text.length < 6) {
-            await ctx.reply('Password too short 😅 Minimum 6 characters:');
-            return;
-          }
-
-          // Register user
-          const { AuthHandler } = await import('./authHandler');
-          const updatedUser = userService.getUser(userInfo.id.toString());
-          
-          if (updatedUser?.email) {
-            try {
-              const { apiService } = await import('../services/apiService');
-              const authResponse = await apiService.registerUser(
-                updatedUser.email,
-                text,
-                updatedUser.firstName
-              );
-
-              userService.authenticate(
-                userInfo.id.toString(),
-                authResponse.token,
-                authResponse.user.id
-              );
-
-              // Clear registration step
-              userService.setUser(userInfo.id.toString(), {
-                registrationStep: undefined
-              });
-
-              await ctx.reply(
-                `Great! Now we know each other 🎉\n\n` +
-                'Tell me, how are you doing? What\'s bothering you or what interests you?'
-              );
-
-              // Start natural conversation
-              userService.setUser(userInfo.id.toString(), {
-                conversationActive: true,
-                conversationHistory: []
-              });
-
-            } catch (apiError: any) {
-              if (apiError.status === 409) {
-                await ctx.reply(
-                  'That email is already registered 😅\n\n' +
-                  'Try logging in: text me your email and I\'ll help you log in'
-                );
-                userService.setUser(userInfo.id.toString(), {
-                  registrationStep: undefined
-                });
-              } else {
-                await ctx.reply('Something went wrong with registration 😔 Try later');
-              }
-            }
-          }
+          // Start natural conversation
+          userService.setUser(userInfo.id.toString(), {
+            conversationActive: true,
+            conversationHistory: []
+          });
           break;
       }
 
