@@ -2,14 +2,14 @@
 
 ## 📊 Overview
 
-The Health Check system provides real-time monitoring of the bot and its components status. Automatically starts an HTTP server for status checks.
+The Health Check system provides real-time monitoring of the bot and its components status. Automatically starts an HTTP server for status checks on port **3002** when the bot starts.
 
 ## 🚀 Quick Start
 
 ### Running bot with healthcheck
 ```bash
 npm run dev
-# Health check will be available at http://localhost:3001
+# Health check will be available at http://localhost:3002
 ```
 
 ### Status checking
@@ -21,7 +21,7 @@ npm run health
 npm run health:json
 
 # Direct request
-curl http://localhost:3001/health
+curl http://localhost:3002/health
 ```
 
 ## 🔗 Endpoints
@@ -85,8 +85,8 @@ Simple availability check
 
 ### Environment variables
 ```bash
-# Port for health check server (default: 3001)
-HEALTH_PORT=3001
+# Port for health check server (default: 3002)
+HEALTH_PORT=3002
 
 # Main bot settings for checking
 BOT_TOKEN=your_bot_token
@@ -110,19 +110,19 @@ npm run health
 npm run health:json
 
 # Custom URL
-node scripts/check-health.js --url=http://production-bot:3001
+node scripts/check-health.js --url=http://production-bot:3002
 ```
 
 ### 3. Curl requests
 ```bash
 # Quick check
-curl -s http://localhost:3001/ping
+curl -s http://localhost:3002/ping
 
 # Full status
-curl -s http://localhost:3001/health | jq .
+curl -s http://localhost:3002/health | jq .
 
 # Status only
-curl -s http://localhost:3001/health | jq -r .status
+curl -s http://localhost:3002/health | jq -r .status
 ```
 
 ## 🚨 Alerting and Monitoring
@@ -172,10 +172,10 @@ bot_memory_usage_bytes ${process.memoryUsage().heapUsed}
 npm test -- healthcheck.test.ts
 
 # Check all endpoints
-curl http://localhost:3001/health
-curl http://localhost:3001/status  
-curl http://localhost:3001/ping
-curl http://localhost:3001/unknown  # Should return 404
+curl http://localhost:3002/health
+curl http://localhost:3002/status  
+curl http://localhost:3002/ping
+curl http://localhost:3002/unknown  # Should return 404
 ```
 
 ## 🔒 Security
@@ -200,7 +200,7 @@ Shows only:
 ### Docker Health Check
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3001/ping || exit 1
+  CMD curl -f http://localhost:3002/ping || exit 1
 ```
 
 ### Kubernetes Probes
@@ -208,14 +208,14 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 livenessProbe:
   httpGet:
     path: /ping
-    port: 3001
+    port: 3002
   initialDelaySeconds: 30
   periodSeconds: 10
 
 readinessProbe:
   httpGet:
     path: /health
-    port: 3001
+    port: 3002
   initialDelaySeconds: 5
   periodSeconds: 5
 ```
@@ -229,7 +229,7 @@ upstream telegram_bot {
 
 # Health check endpoint
 location /health {
-    proxy_pass http://telegram_bot:3001/health;
+    proxy_pass http://telegram_bot:3002/health;
 }
 ```
 

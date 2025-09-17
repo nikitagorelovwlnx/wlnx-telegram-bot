@@ -8,6 +8,7 @@ TypeScript Telegram bot integrated with WLNX API Server for managing interviews,
 - 📊 Interview results management
 - 🌿 **AI-powered wellness coaching with ChatGPT**
 - 📈 Automatic health statistics extraction
+- 🏥 **Health check monitoring system (port 3002)**
 - 📅 Calendar integration support
 - 🤖 Interactive Telegram interface
 - 👑 Admin panel
@@ -84,6 +85,19 @@ npm start
 
 ```bash
 npm test
+```
+
+### Health Monitoring
+
+```bash
+# Check bot health status
+curl http://localhost:3002/health
+
+# Simple ping check
+curl http://localhost:3002/ping
+
+# Using npm scripts
+npm run health
 ```
 
 ## Bot Commands
