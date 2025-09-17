@@ -242,6 +242,84 @@ export class CommandHandler {
     }
   }
 
+  // Save current conversation to server
+  static async saveConversation(ctx: Context): Promise<void> {
+    try {
+      const userInfo = getUserInfo(ctx);
+      const user = userService.getUser(userInfo.id.toString());
+      const { conversationService } = await import('../services/conversationService');
+
+      if (!user?.isAuthenticated) {
+        await ctx.reply('❌ Вы не авторизованы. Используйте /start для входа.');
+        return;
+      }
+
+      const conversationHistory = user?.conversationHistory || [];
+      
+      if (conversationHistory.length === 0) {
+        await ctx.reply('💬 Пока нет разговора для сохранения. Начните общение!');
+        return;
+      }
+
+      const token = userService.getApiToken(userInfo.id.toString());
+      if (!token) {
+        await ctx.reply('❌ Нет токена авторизации. Попробуйте перелогиниться.');
+        return;
+      }
+
+      await ctx.reply('⏳ Сохраняю результаты интервью на сервер...');
+
+      try {
+        const { apiService } = await import('../services/apiService');
+        
+        // Generate comprehensive wellness summary
+        const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+        
+        // Create transcription from conversation history
+        const transcription = conversationHistory
+          .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
+          .join('\n\n');
+        
+        // Check if wellness interview exists for this user
+        const interviews = await apiService.getWellnessInterviews(token);
+        let currentInterview = interviews.length > 0 ? interviews[0] : null;
+        
+        if (!currentInterview) {
+          // Create new wellness interview
+          currentInterview = await apiService.createWellnessInterview(token, {
+            transcription: transcription,
+            summary: wellnessSummary
+          });
+          await ctx.reply('✅ Новое интервью создано и сохранено на сервере!');
+        } else {
+          // Update existing interview
+          await apiService.updateWellnessInterview(token, currentInterview.id, {
+            transcription: transcription,
+            summary: wellnessSummary
+          });
+          await ctx.reply('✅ Интервью обновлено на сервере!');
+        }
+
+        logUserAction(ctx, 'manual_conversation_save', {
+          messageCount: conversationHistory.length,
+          transcriptionLength: transcription.length,
+          summaryLength: wellnessSummary.length
+        });
+
+      } catch (apiError: any) {
+        logger.error('Failed to save conversation to API', apiError);
+        await ctx.reply(
+          '❌ Ошибка при сохранении на сервер:\n' +
+          `${apiError.message || 'Неизвестная ошибка'}\n\n` +
+          'Попробуйте позже или проверьте подключение к серверу.'
+        );
+      }
+
+    } catch (error) {
+      handleError(ctx, error, 'Ошибка при сохранении разговора');
+    }
+  }
+
   // Handle natural conversation with AI
   static async handleNaturalConversation(ctx: Context, text: string): Promise<void> {
     try {
@@ -286,7 +364,7 @@ export class CommandHandler {
       });
 
       // Save to API with transcription and AI-generated summary
-      if (conversationHistory.length >= 10) { // Save after meaningful conversation
+      if (conversationHistory.length >= 6) { // Save after meaningful conversation
         try {
           const token = userService.getApiToken(userInfo.id.toString());
           if (token) {
@@ -310,12 +388,22 @@ export class CommandHandler {
                 transcription: transcription,
                 summary: wellnessSummary
               });
+              
+              // Notify user about auto-save
+              setTimeout(() => {
+                ctx.reply('💾 Интервью автоматически сохранено на сервер! (Можно также использовать /save_interview для ручного сохранения)');
+              }, 2000);
             } else {
               // Update existing interview
               await apiService.updateWellnessInterview(token, currentInterview.id, {
                 transcription: transcription,
                 summary: wellnessSummary
               });
+              
+              // Notify user about auto-update
+              setTimeout(() => {
+                ctx.reply('💾 Интервью обновлено на сервере!');
+              }, 2000);
             }
           }
         } catch (apiError) {
