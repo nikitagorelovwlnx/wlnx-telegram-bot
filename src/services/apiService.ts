@@ -210,8 +210,14 @@ class ApiService {
     console.log('Creating wellness interview with data:', {
       email: requestData.email,
       transcriptionLength: requestData.transcription?.length || 0,
-      summaryLength: requestData.summary?.length || 0
+      summaryLength: requestData.summary?.length || 0,
+      transcriptionPreview: requestData.transcription?.substring(0, 100) + '...',
+      summaryPreview: requestData.summary?.substring(0, 100) + '...',
+      url: '/interviews',
+      method: 'POST'
     });
+    
+    console.log('Full request data:', JSON.stringify(requestData, null, 2));
     
     const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', requestData);
     return response.data;
