@@ -1,131 +1,131 @@
-# Тесты для WLNX Telegram Bot
+# Tests for WLNX Telegram Bot
 
-Этот каталог содержит комплексные тесты для Telegram бота с мокированием внешних сервисов.
+This directory contains comprehensive tests for the Telegram bot with external service mocking.
 
-## Структура тестов
+## Test Structure
 
 ### `setup.ts`
-Настройка тестовой среды:
-- Мокирование OpenAI API
-- Мокирование Axios для API вызовов
-- Мокирование Telegraf
-- Настройка переменных окружения
+Test environment setup:
+- OpenAI API mocking
+- Axios mocking for API calls
+- Telegraf mocking
+- Environment variables setup
 
 ### `services/`
 **conversationService.test.ts**
-- Тесты генерации ответов AI
-- Тесты извлечения данных пользователей
-- Тесты генерации wellness summary
-- Обработка ошибок OpenAI
+- AI response generation tests
+- User data extraction tests
+- Wellness summary generation tests
+- OpenAI error handling
 
 **apiService.test.ts**
-- Тесты CRUD операций для wellness интервью
-- Тесты аутентификации пользователей
-- Тесты обработки ошибок API
-- Мокирование axios запросов
+- CRUD operations tests for wellness interviews
+- User authentication tests
+- API error handling tests
+- Axios request mocking
 
 ### `handlers/`
 **commandHandler.test.ts**
-- Тесты команд бота (/start, /help, etc.)
-- Тесты естественного диалога
-- Тесты регистрации пользователей
-- Тесты сохранения интервью
+- Bot command tests (/start, /help, etc.)
+- Natural dialogue tests
+- User registration tests
+- Interview saving tests
 
 ### `data-extraction/`
 **userInfoExtraction.test.ts**
-- Детальные тесты извлечения демографических данных
-- Тесты биометрических показателей
-- Тесты медицинской информации
-- Тесты целей и предпочтений
-- Тесты дедупликации данных
+- Detailed demographic data extraction tests
+- Biometric indicators tests
+- Medical information tests
+- Goals and preferences tests
+- Data deduplication tests
 
 ### `integration/`
 **bot-workflow.test.ts**
-- Полный цикл: регистрация → диалог → извлечение → сохранение
-- Тесты автосохранения
-- Тесты консистентности данных
-- Тесты производительности
-- Тесты приватности данных
+- Full cycle: registration → dialogue → extraction → saving
+- Auto-save tests
+- Data consistency tests
+- Performance tests
+- Data privacy tests
 
-## Запуск тестов
+## Running Tests
 
 ```bash
-# Все тесты
+# All tests
 npm test
 
-# Конкретный тест
+# Specific test
 npm test -- conversationService.test.ts
 
-# С покрытием кода
+# With code coverage
 npm run test:coverage
 
-# Режим наблюдения
+# Watch mode
 npm run test:watch
 ```
 
-## Настройка мокирования
+## Mocking Setup
 
 ### OpenAI API
-Мокируется в `setup.ts`, возвращает предсказуемые ответы для тестирования.
+Mocked in `setup.ts`, returns predictable responses for testing.
 
-### Axios/API вызовы
-Каждый тест настраивает свои мок-ответы через `mockAxiosInstance`.
+### Axios/API calls
+Each test configures its own mock responses via `mockAxiosInstance`.
 
 ### Telegram Bot API
-Мокируется Telegraf и Context для симуляции взаимодействий.
+Telegraf and Context are mocked for interaction simulation.
 
-## Паттерны тестирования
+## Testing Patterns
 
-### 1. Изоляция тестов
-Каждый тест независим и очищает состояние в `beforeEach`.
+### 1. Test Isolation
+Each test is independent and clears state in `beforeEach`.
 
-### 2. Мокирование внешних зависимостей
+### 2. External Dependency Mocking
 - OpenAI API
-- HTTP запросы
+- HTTP requests
 - Telegram API
-- Логирование
+- Logging
 
-### 3. Тестирование edge cases
-- Пустые/некорректные данные
-- API ошибки
-- Сетевые проблемы
-- Большие объемы данных
+### 3. Edge Case Testing
+- Empty/invalid data
+- API errors
+- Network issues
+- Large data volumes
 
-### 4. Интеграционные тесты
-Тестируют полные пользовательские сценарии end-to-end.
+### 4. Integration Tests
+Test complete user scenarios end-to-end.
 
-## Метрики покрытия
+## Coverage Metrics
 
-Целевые показатели:
+Target metrics:
 - **Statements**: > 80%
 - **Branches**: > 75%
 - **Functions**: > 85%
 - **Lines**: > 80%
 
-## Отладка тестов
+## Test Debugging
 
 ```bash
-# Запуск с детальным выводом
+# Run with detailed output
 npm test -- --verbose
 
-# Отладка конкретного теста
+# Debug specific test
 npm test -- --testNamePattern="should extract age"
 
-# Только неудачные тесты
+# Only failed tests
 npm test -- --onlyFailures
 ```
 
 ## Continuous Integration
 
-Тесты автоматически запускаются при:
-- Push в любую ветку
+Tests run automatically on:
+- Push to any branch
 - Pull Request
 - Scheduled builds
 
-## Добавление новых тестов
+## Adding New Tests
 
-1. Создать файл в соответствующей папке
-2. Импортировать необходимые зависимости
-3. Настроить мокирование в `beforeEach`
-4. Написать тесты следуя существующим паттернам
-5. Обеспечить очистку состояния после тестов
+1. Create file in appropriate folder
+2. Import necessary dependencies
+3. Set up mocking in `beforeEach`
+4. Write tests following existing patterns
+5. Ensure state cleanup after tests

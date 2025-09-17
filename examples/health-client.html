@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WLNX Bot Health Monitor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .status-card {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-healthy { background-color: #28a745; }
+        .status-degraded { background-color: #ffc107; }
+        .status-unhealthy { background-color: #dc3545; }
+        .status-unknown { background-color: #6c757d; }
+        
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 20px;
+        }
+        .service-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #dee2e6;
+        }
+        .service-card.up { border-left-color: #28a745; }
+        .service-card.down { border-left-color: #dc3545; }
+        .service-card.unknown { border-left-color: #6c757d; }
+        
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px;
+        }
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+        .refresh-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .info-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 600;
+        }
+        .info-value {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 WLNX Bot Health Monitor</h1>
+            <p>Real-time status monitoring for Telegram wellness bot</p>
+        </div>
+        
+        <div id="loading" class="loading">
+            <p>Loading bot status...</p>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="status-content" style="display: none;">
+            <div class="status-card">
+                <h2>
+                    <span id="status-indicator" class="status-indicator"></span>
+                    Overall Status: <span id="overall-status"></span>
+                </h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Uptime</div>
+                        <div class="info-value" id="uptime"></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Version</div>
+                        <div class="info-value" id="version"></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Memory Usage</div>
+                        <div class="info-value" id="memory"></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Last Updated</div>
+                        <div class="info-value" id="timestamp"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="services" id="services"></div>
+        </div>
+        
+        <button id="refresh-btn" class="refresh-btn" onclick="checkHealth()">
+            🔄 Refresh Status
+        </button>
+    </div>
+
+    <script>
+        const BOT_HEALTH_URL = 'http://localhost:3001'; // Change this to your bot's health endpoint
+        
+        function formatDuration(ms) {
+            const seconds = Math.floor(ms / 1000) % 60;
+            const minutes = Math.floor(ms / (1000 * 60)) % 60;
+            const hours = Math.floor(ms / (1000 * 60 * 60)) % 24;
+            const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+            
+            if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+            if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+            if (minutes > 0) return `${minutes}m ${seconds}s`;
+            return `${seconds}s`;
+        }
+        
+        function formatTimestamp(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+        
+        async function checkHealth() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const contentEl = document.getElementById('status-content');
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            contentEl.style.display = 'none';
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '🔄 Checking...';
+            
+            try {
+                const response = await fetch(`${BOT_HEALTH_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayHealthData(data);
+                    loadingEl.style.display = 'none';
+                    contentEl.style.display = 'block';
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Health check failed:', error);
+                errorEl.textContent = `Failed to check bot health: ${error.message}. Make sure the bot is running on ${BOT_HEALTH_URL}`;
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Refresh Status';
+            }
+        }
+        
+        function displayHealthData(data) {
+            // Overall status
+            const statusIndicator = document.getElementById('status-indicator');
+            const overallStatus = document.getElementById('overall-status');
+            
+            statusIndicator.className = `status-indicator status-${data.status}`;
+            overallStatus.textContent = data.status.toUpperCase();
+            
+            // Basic info
+            document.getElementById('uptime').textContent = formatDuration(data.uptime);
+            document.getElementById('version').textContent = data.version;
+            document.getElementById('memory').textContent = `${data.memory.used}MB / ${data.memory.total}MB (${data.memory.percentage}%)`;
+            document.getElementById('timestamp').textContent = formatTimestamp(data.timestamp);
+            
+            // Services
+            const servicesEl = document.getElementById('services');
+            servicesEl.innerHTML = '';
+            
+            Object.entries(data.services).forEach(([name, service]) => {
+                const serviceCard = document.createElement('div');
+                serviceCard.className = `service-card ${service.status}`;
+                
+                const serviceName = name.charAt(0).toUpperCase() + name.slice(1);
+                const responseTime = service.responseTime ? `${service.responseTime}ms` : 'N/A';
+                const errorMsg = service.error ? `<div style="color: #dc3545; font-size: 12px; margin-top: 5px;">${service.error}</div>` : '';
+                
+                serviceCard.innerHTML = `
+                    <h4>${serviceName}</h4>
+                    <p><strong>Status:</strong> ${service.status.toUpperCase()}</p>
+                    <p><strong>Response Time:</strong> ${responseTime}</p>
+                    ${errorMsg}
+                `;
+                
+                servicesEl.appendChild(serviceCard);
+            });
+        }
+        
+        // Check health on page load
+        checkHealth();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+</html>

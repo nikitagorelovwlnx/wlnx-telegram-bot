@@ -12,6 +12,8 @@
     "test:coverage": "jest --coverage",
     "test:integration": "jest --testPathPattern=integration",
     "test:unit": "jest --testPathPattern=services|handlers|data-extraction",
+    "health": "node scripts/check-health.js",
+    "health:json": "node scripts/check-health.js --format=json",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
   },

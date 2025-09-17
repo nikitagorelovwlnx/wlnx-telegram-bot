@@ -1,5 +1,5 @@
 /**
- * Промпты для генерации wellness summary
+ * Prompts for wellness summary generation
  */
 
 export const WELLNESS_SUMMARY_SYSTEM_PROMPT = `You are a wellness data analyst. Analyze conversation transcripts and extracted user data to create comprehensive wellness summaries.`;
