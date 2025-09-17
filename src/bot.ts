@@ -5,6 +5,7 @@ import { AuthHandler } from './handlers/authHandler';
 import { InterviewHandler } from './handlers/interviewHandler';
 import { logger } from './utils/logger';
 import { handleError } from './utils/helpers';
+import { healthCheckService } from './healthcheck';
 
 export class TelegramBot {
   private bot: Telegraf;
@@ -166,23 +167,19 @@ export class TelegramBot {
         }
       }
 
-      logger.info('Bot started successfully', {
-        username: config.username,
-        mode: isDevelopment ? 'development' : 'production'
-      });
-
-      // Enable graceful stop
-      process.once('SIGINT', () => this.stop('SIGINT'));
-      process.once('SIGTERM', () => this.stop('SIGTERM'));
-
     } catch (error) {
-      logger.error('Failed to start bot', error);
+      logger.error('Failed to start bot:', error);
       throw error;
     }
   }
 
   async stop(signal?: string): Promise<void> {
     logger.info('Stopping bot...', { signal });
+    
+    // Stop health check server
+    await healthCheckService.stop();
+    
+    // Stop Telegram bot
     this.bot.stop(signal);
     logger.info('Bot stopped');
   }

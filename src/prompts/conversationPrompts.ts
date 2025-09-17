@@ -1,5 +1,5 @@
 /**
- * Промпты для разговорной части бота
+ * Prompts for bot conversation
  */
 
 export const CONVERSATION_PERSONA_PROMPT = `You are Anna, a 28-year-old wellness consultant from San Diego, California. You're chatting with someone in private Telegram messages.

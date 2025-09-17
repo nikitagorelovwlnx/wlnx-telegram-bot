@@ -1,8 +1,8 @@
-# 🧪 Руководство по тестированию WLNX Telegram Bot
+# 🧪 Testing Guide for WLNX Telegram Bot
 
-## ✅ Полный комплект тестов с мокированием внешних сервисов
+## ✅ Complete test suite with external service mocking
 
-### 📁 Структура тестов
+### 📁 Test Structure
 
 ```
 src/__tests__/
@@ -20,74 +20,74 @@ src/__tests__/
     └── bot-workflow.test.ts            # End-to-end тесты
 ```
 
-### 🚀 Запуск тестов
+### 🚀 Running Tests
 
 ```bash
-# Все тесты
+# All tests
 npm test
 
-# Тесты с покрытием кода
+# Tests with code coverage
 npm run test:coverage
 
-# Только unit тесты
+# Unit tests only
 npm run test:unit
 
-# Только интеграционные тесты
+# Integration tests only
 npm run test:integration
 
-# Режим наблюдения (перезапуск при изменениях)
+# Watch mode (restart on changes)
 npm run test:watch
 ```
 
-### 🔧 Что замокировано
+### 🔧 What's Mocked
 
 #### External APIs
-- **OpenAI API** - возвращает предсказуемые ответы
-- **HTTP вызовы (Axios)** - полностью замокированы
-- **Telegram Bot API** - эмуляция Context и действий
+- **OpenAI API** - returns predictable responses
+- **HTTP calls (Axios)** - fully mocked
+- **Telegram Bot API** - Context and actions emulation
 
 #### Internal Services
-- **Логирование** - перехватывается Jest
-- **Переменные окружения** - настроены для тестов
-- **Файловая система** - не используется
+- **Logging** - intercepted by Jest
+- **Environment variables** - configured for tests
+- **File system** - not used
 
-### 📊 Покрытие тестами
+### 📈 Test Coverage
 
 #### ConversationService
-- ✅ Генерация ответов AI
-- ✅ Извлечение пользовательских данных (demographics, biometrics, medical, goals)
-- ✅ Создание wellness summary с использованием извлеченных данных
-- ✅ Обработка ошибок OpenAI
+- ✅ AI response generation
+- ✅ User data extraction (demographics, biometrics, medical, goals)
+- ✅ Wellness summary creation using extracted data
+- ✅ OpenAI error handling
 
 #### ApiService
-- ✅ CRUD операции wellness интервью
-- ✅ Аутентификация пользователей
-- ✅ Обработка HTTP ошибок
-- ✅ Логирование API запросов
+- ✅ CRUD operations for wellness interviews
+- ✅ User authentication
+- ✅ HTTP error handling
+- ✅ API request logging
 
 #### CommandHandler
-- ✅ Команды бота (/start, /help, /settings)
-- ✅ Естественный диалог с AI
-- ✅ Регистрация пользователей
-- ✅ Ручное и автоматическое сохранение интервью
+- ✅ Bot commands (/start, /help, /settings)
+- ✅ Natural dialogue with AI
+- ✅ User registration
+- ✅ Manual and automatic interview saving
 
 #### Data Extraction
-- ✅ Извлечение возраста, веса, роста
-- ✅ Биометрические данные (сон, шаги, пульс)
-- ✅ Медицинская информация
-- ✅ Цели и предпочтения
-- ✅ Дедупликация данных
+- ✅ Age, weight, height extraction
+- ✅ Biometric data (sleep, steps, pulse)
+- ✅ Medical information
+- ✅ Goals and preferences
+- ✅ Data deduplication
 
 #### Integration Tests
-- ✅ Полный цикл: регистрация → диалог → сохранение
-- ✅ Автосохранение после 6+ сообщений
-- ✅ Консистентность данных между extraction и summary
-- ✅ Обработка ошибок API
-- ✅ Производительность с большими разговорами
+- ✅ Full cycle: registration → dialogue → saving
+- ✅ Auto-save after 6+ messages
+- ✅ Data consistency between extraction and summary
+- ✅ API error handling
+- ✅ Performance with large conversations
 
-### 🎯 Примеры использования
+### 🎯 Usage Examples
 
-#### Тест извлечения данных
+#### Data extraction test
 ```typescript
 it('should extract comprehensive user data', () => {
   const conversation = [
@@ -102,7 +102,7 @@ it('should extract comprehensive user data', () => {
 });
 ```
 
-#### Тест API с мокированием
+#### API test with mocking
 ```typescript
 it('should create wellness interview', async () => {
   mockAxiosInstance.post.mockResolvedValue({ data: mockInterview });
@@ -116,85 +116,85 @@ it('should create wellness interview', async () => {
 });
 ```
 
-#### Интеграционный тест
+#### Integration test
 ```typescript
 it('should complete full wellness interview flow', async () => {
-  // 1. Регистрация
+  // 1. Registration
   await CommandHandler.start(mockCtx);
   await CommandHandler.handleRegistrationFlow(mockCtx, 'John');
   
-  // 2. Диалог
+  // 2. Dialogue
   await CommandHandler.handleNaturalConversation(mockCtx, "I'm 30 years old");
   
-  // 3. Сохранение
+  // 3. Saving
   await CommandHandler.saveConversation(mockCtx);
   
   expect(mockApiService.createWellnessInterview).toHaveBeenCalled();
 });
 ```
 
-### 🔍 Отладка тестов
+### 🔍 Test Debugging
 
 ```bash
-# Запуск с детальным выводом
+# Run with detailed output
 npm test -- --verbose
 
-# Отладка конкретного теста
+# Debug specific test
 npm test -- --testNamePattern="should extract age"
 
-# Только неудачные тесты
+# Only failed tests
 npm test -- --onlyFailures
 ```
 
 ### 🛡️ Edge Cases
 
-Тесты покрывают:
-- Пустые/некорректные данные
-- API ошибки (400, 404, 500)
-- Сетевые проблемы
-- Большие объемы данных (100+ сообщений)
-- Конфиденциальность данных
-- Производительность
+Tests cover:
+- Empty/invalid data
+- API errors (400, 404, 500)
+- Network issues
+- Large data volumes (100+ messages)
+- Data privacy
+- Performance
 
 ### 📈 CI/CD Integration
 
-Тесты готовы для:
+Tests are ready for:
 - GitHub Actions
 - GitLab CI
 - Jenkins
-- Любой CI/CD pipeline с Node.js
+- Any CI/CD pipeline with Node.js
 
-### 🔐 Безопасность
+### 🔐 Security
 
-- Моки не содержат реальных API ключей
-- Тестовые данные не содержат PII
-- Логирование фильтрует конфиденциальную информацию
+- Mocks don't contain real API keys
+- Test data doesn't contain PII
+- Logging filters confidential information
 
-### 📝 Добавление новых тестов
+### 📝 Adding New Tests
 
-1. Создать файл в соответствующей папке
-2. Импортировать setup и зависимости
-3. Настроить моки в `beforeEach`
-4. Следовать паттернам существующих тестов
-5. Обеспечить очистку после тестов
+1. Create file in appropriate folder
+2. Import setup and dependencies
+3. Set up mocks in `beforeEach`
+4. Follow patterns of existing tests
+5. Ensure cleanup after tests
 
-### 🏆 Целевые метрики покрытия
+### 🏆 Target Coverage Metrics
 
 - **Statements**: > 80%
 - **Branches**: > 75% 
 - **Functions**: > 85%
 - **Lines**: > 80%
 
-### 💡 Лучшие практики
+### 💡 Best Practices
 
-- Изолированные тесты
-- Предсказуемые моки
-- Читаемые assertion'ы
-- Тестирование edge cases
-- Быстрое выполнение (< 30 сек для всех тестов)
+- Isolated tests
+- Predictable mocks
+- Readable assertions
+- Edge case testing
+- Fast execution (< 30 sec for all tests)
 
 ---
 
-**Готово к запуску!** 🚀
+**Ready to run!** 🚀
 
-Все тесты настроены и готовы для проверки функциональности бота с полным мокированием внешних сервисов.
+All tests are configured and ready to verify bot functionality with full external service mocking.

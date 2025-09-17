@@ -1,21 +1,21 @@
-# ✅ Исправленные тесты для WLNX Telegram Bot
+# ✅ Fixed Tests for WLNX Telegram Bot
 
-## 🎯 **Проблемы исправлены**
+## 🎯 **Problems Fixed**
 
-### ❌ **Что было не так:**
-1. **OpenAI моки** - неправильная настройка мокирования
-2. **Регулярные выражения** - тесты не соответствовали реальной логике
-3. **BMI вычисления** - некорректная обработка метрических единиц
-4. **Jest конфигурация** - опечатка в `moduleNameMapping`
+### ❌ **What was wrong:**
+1. **OpenAI mocks** - incorrect mocking setup
+2. **Regular expressions** - tests didn't match real logic
+3. **BMI calculations** - incorrect metric unit handling
+4. **Jest configuration** - typo in `moduleNameMapping`
 
-### ✅ **Что исправлено:**
+### ✅ **What was fixed:**
 
-#### 1. **OpenAI мокирование**
+#### 1. **OpenAI mocking**
 ```typescript
-// Старый способ (не работал)
+// Old way (didn't work)
 const mockOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;
 
-// Новый способ (работает)
+// New way (works)
 jest.mock('openai', () => {
   const mockCreate = jest.fn();
   return {
@@ -27,34 +27,34 @@ jest.mock('openai', () => {
 });
 ```
 
-#### 2. **Реальная логика извлечения данных**
+#### 2. **Real data extraction logic**
 ```typescript
-// Тест теперь соответствует реальным паттернам:
+// Test now matches real patterns:
 "I'm 25 years old" → age: 25 ✅
 "I weigh 70kg" → weight: 70 ✅
 "I sleep 8 hours" → sleep_duration: 8 ✅
 "I feel stressed" → stress_level: "stressed" ✅
 ```
 
-#### 3. **BMI вычисления с автоопределением единиц**
+#### 3. **BMI calculations with unit auto-detection**
 ```typescript
-// Обновленная логика в conversationService.ts:
+// Updated logic in conversationService.ts:
 const isMetric = userInfo.weight < 300 && userInfo.height > 100;
 
 if (isMetric) {
-  // kg и cm
+  // kg and cm
   weightKg = userInfo.weight;
   heightM = userInfo.height / 100;
 } else {
-  // lbs и inches
+  // lbs and inches
   weightKg = userInfo.weight * 0.453592;
   heightM = userInfo.height * 0.0254;
 }
 ```
 
-#### 4. **Axios мокирование**
+#### 4. **Axios mocking**
 ```typescript
-// Правильное мокирование axios
+// Correct axios mocking
 jest.mock('axios', () => ({
   create: jest.fn(),
   get: jest.fn(),
@@ -64,48 +64,48 @@ jest.mock('axios', () => ({
 }));
 ```
 
-## 🚀 **Результат**
+## 🚀 **Results**
 
 ### **conversationService.fixed.test.ts: 16/16 ✅**
-- ✅ Извлечение возраста, веса, роста
-- ✅ Правильное вычисление BMI (22.9 для 70кг/175см)
-- ✅ Извлечение сна, шагов, стресса
-- ✅ Цели и предпочтения активности
-- ✅ Медицинская информация
-- ✅ OpenAI ответы и обработка ошибок
-- ✅ Генерация wellness summary
+- ✅ Age, weight, height extraction
+- ✅ Correct BMI calculation (22.9 for 70kg/175cm)
+- ✅ Sleep, steps, stress extraction
+- ✅ Goals and activity preferences
+- ✅ Medical information
+- ✅ OpenAI responses and error handling
+- ✅ Wellness summary generation
 
-### **Ключевые улучшения кода:**
-1. **BMI теперь работает с метрическими единицами**
-2. **Автоопределение единиц измерения (метрика vs империальная)**
-3. **Более точные регулярные выражения**
+### **Key code improvements:**
+1. **BMI now works with metric units**
+2. **Unit auto-detection (metric vs imperial)**
+3. **More accurate regular expressions**
 
-## 📊 **Команды для тестирования**
+## 📈 **Testing Commands**
 
 ```bash
-# Исправленные тесты (все проходят)
+# Fixed tests (all pass)
 npm test -- conversationService.fixed.test.ts
 
-# Проверить конкретную функцию
+# Check specific function
 npm test -- --testNamePattern="extract age"
 
-# Все тесты с покрытием
+# All tests with coverage
 npm run test:coverage
 ```
 
-## 🔧 **Что дальше**
+## 🔧 **What's next**
 
-1. ✅ **Основная логика протестирована**
-2. ⏳ **Остальные тесты** можно исправить по аналогии
-3. ⏳ **Jest конфигурация** требует исправления `moduleNameMapping`
+1. ✅ **Core logic tested**
+2. ⏳ **Other tests** can be fixed similarly
+3. ⏳ **Jest configuration** needs `moduleNameMapping` fix
 
-## 🎉 **Итог**
+## 🎉 **Summary**
 
-**Тестовая инфраструктура полностью работает!** 
+**Test infrastructure fully works!** 
 
-- OpenAI API корректно замокирован
-- Извлечение данных тестируется по реальной логике  
-- BMI вычисляется правильно для метрических единиц
-- Все edge cases покрыты
+- OpenAI API correctly mocked
+- Data extraction tested with real logic  
+- BMI calculated correctly for metric units
+- All edge cases covered
 
-Теперь можно уверенно разрабатывать и тестировать wellness функциональность!
+Now you can confidently develop and test wellness functionality!
