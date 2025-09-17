@@ -271,7 +271,17 @@ export class CommandHandler {
       try {
         const { apiService } = await import('../services/apiService');
         
-        // Generate comprehensive wellness summary
+        // Extract user info for logging
+        const extractedInfo = conversationService.extractUserInfo(conversationHistory);
+        logger.info('Manual save - Extracted wellness data before summary generation:', {
+          extractedFields: Object.keys(extractedInfo).filter(key => {
+            const value = (extractedInfo as any)[key];
+            return value !== undefined && value !== null && value !== '';
+          }),
+          extractedData: extractedInfo
+        });
+        
+        // Generate comprehensive wellness summary (now uses extracted data internally)
         const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
         
         // Create transcription from conversation history
@@ -385,7 +395,17 @@ export class CommandHandler {
         try {
           const { apiService } = await import('../services/apiService');
           
-          // Generate comprehensive wellness summary
+          // Extract user info for logging
+          const extractedInfo = conversationService.extractUserInfo(conversationHistory);
+          logger.info('Extracted wellness data before summary generation:', {
+            extractedFields: Object.keys(extractedInfo).filter(key => {
+              const value = (extractedInfo as any)[key];
+              return value !== undefined && value !== null && value !== '';
+            }),
+            extractedData: extractedInfo
+          });
+          
+          // Generate comprehensive wellness summary (now uses extracted data internally)
           const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
           
           // Create transcription from conversation history

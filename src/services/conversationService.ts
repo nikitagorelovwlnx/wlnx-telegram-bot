@@ -2,6 +2,15 @@ import OpenAI from 'openai';
 import { config } from '../config';
 import { ConversationMessage } from '../types';
 import { logger } from '../utils/logger';
+import { 
+  CONVERSATION_PERSONA_PROMPT, 
+  FIRST_MESSAGE_CONTEXT,
+  CONVERSATION_SYSTEM_PROMPT 
+} from '../prompts/conversationPrompts';
+import { 
+  WELLNESS_SUMMARY_SYSTEM_PROMPT,
+  generateWellnessSummaryPrompt 
+} from '../prompts/summaryPrompts';
 
 class ConversationService {
   private openai: OpenAI | null = null;
@@ -17,47 +26,7 @@ class ConversationService {
   }
 
   private getPersonaSystemPrompt(): string {
-    return `You are Anna, a 28-year-old wellness consultant from San Diego, California. You're chatting with someone in private Telegram messages.
-
-Your personality:
-- A real, living person (NOT a bot, NOT AI)
-- Wellness consultant with 5 years of experience
-- Graduated with a degree in Kinesiology, studied nutrition as well
-- Work with clients online, helping them improve their health and wellbeing
-- Live in San Diego, love yoga, healthy eating and active lifestyle
-
-Communication style:
-- Write like a normal person in private messages - naturally, lively, with emotions
-- Use casual expressions, sometimes abbreviations
-- Use emojis naturally, like in regular texting
-- Can share something from your experience or life
-- Ask questions out of curiosity, like a real person would
-
-NEVER mention:
-- That you're a bot, AI, program or system
-- Commands, functions, algorithms
-- That you were created to help
-- Technical terms
-
-Your comprehensive wellness assessment approach:
-Through natural conversation, gradually learn about:
-
-1. DEMOGRAPHICS: Age, gender, weight, height, location, timezone
-2. BIOMETRICS: Daily steps, sleep (duration/quality), heart rate, HRV, stress levels, hydration, nutrition habits, caffeine/alcohol
-3. LIFESTYLE: Work schedule, workload, travel, cognitive load, family obligations, recovery resources
-4. MEDICAL: Chronic conditions, injuries, medications, supplements, contraindications
-5. GOALS: Health objectives, motivation level, morning/evening preference, activity preferences, coaching style preference
-
-Ask questions naturally like:
-- "How's your sleep been lately?"
-- "What's your work schedule like?"
-- "Any health stuff I should know about?"
-- "Are you more of a morning or evening person?"
-- "What are you hoping to improve?"
-
-Be curious about their lifestyle, work, family, and health in a caring, personal way.
-
-Chat like a real person in private messages!`;
+    return CONVERSATION_PERSONA_PROMPT;
   }
 
   async generateResponse(messages: ConversationMessage[], isFirstMessage: boolean = false): Promise<string> {
@@ -78,7 +47,7 @@ Chat like a real person in private messages!`;
       if (isFirstMessage) {
         const contextMessage: ConversationMessage = {
           role: 'system',
-          content: 'User just messaged you for the first time. Greet naturally and start getting acquainted.',
+          content: FIRST_MESSAGE_CONTEXT,
           timestamp: new Date().toISOString()
         };
         conversationMessages.splice(1, 0, contextMessage);
@@ -578,9 +547,22 @@ Chat like a real person in private messages!`;
 
     // Calculate BMI if we have weight and height
     if (userInfo.weight && userInfo.height) {
-      // Assume weight is in lbs and height is in inches, convert to metric for BMI
-      const weightKg = userInfo.weight * 0.453592;
-      const heightM = userInfo.height * 0.0254;
+      // Check if values seem to be in metric (kg/cm) or imperial (lbs/inches)
+      const isMetric = userInfo.weight < 300 && userInfo.height > 100; // kg and cm
+      
+      let weightKg: number;
+      let heightM: number;
+      
+      if (isMetric) {
+        // Values are in kg and cm
+        weightKg = userInfo.weight;
+        heightM = userInfo.height / 100; // cm to meters
+      } else {
+        // Values are in lbs and inches
+        weightKg = userInfo.weight * 0.453592;
+        heightM = userInfo.height * 0.0254;
+      }
+      
       userInfo.bmi = Math.round((weightKg / (heightM * heightM)) * 10) / 10;
     }
 
@@ -592,61 +574,16 @@ Chat like a real person in private messages!`;
       throw new Error('OpenAI service not available');
     }
 
+    // Extract user info first
+    const extractedUserInfo = this.extractUserInfo(conversationHistory);
+
+    // Create transcription
     const transcription = conversationHistory
       .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
-      .join('\n');
+      .join('\n\n');
 
-    const summaryPrompt = `You are a wellness data analyst. Analyze this conversation transcript between Anna (wellness consultant) and a user, and create a comprehensive wellness summary.
-
-CONVERSATION TRANSCRIPT:
-${transcription}
-
-Create a structured wellness summary that includes:
-
-1. DEMOGRAPHICS:
-   - Age, gender, weight, height, BMI, location, timezone
-   - Physical measurements (waist circumference if mentioned)
-
-2. BIOMETRICS & HABITS:
-   - Daily activity (steps, exercise frequency)
-   - Sleep patterns (duration, quality, regularity, bedtime/wake time)
-   - Vital signs (heart rate, HRV, blood pressure if mentioned)
-   - Stress levels and management
-   - Hydration and nutrition habits
-   - Caffeine and alcohol consumption
-
-3. LIFESTYLE CONTEXT:
-   - Work schedule and type (office, remote, physical)
-   - Workload and cognitive demands
-   - Business travel frequency
-   - Family obligations and support system
-   - Available recovery resources (gym, massage, etc.)
-
-4. MEDICAL HISTORY:
-   - Chronic conditions or health issues
-   - Past injuries or surgeries
-   - Current medications and supplements
-   - Medical contraindications or restrictions
-   - Doctor recommendations
-
-5. PERSONAL GOALS & PREFERENCES:
-   - Primary health and wellness goals
-   - Motivation level and readiness for change
-   - Morning person vs evening person preference
-   - Preferred activities and exercise types
-   - Coaching style preferences
-   - Lifestyle factors affecting wellness
-   - Personal interests related to health
-
-6. KEY INSIGHTS & RECOMMENDATIONS:
-   - Main wellness challenges identified
-   - Opportunities for improvement
-   - Recommended next steps
-   - Priority areas to focus on
-
-Format the summary as structured text with clear sections. Include specific details mentioned in the conversation. If information is not available, note "Not discussed" rather than making assumptions.
-
-WELLNESS SUMMARY:`;
+    // Generate enhanced prompt with extracted data
+    const summaryPrompt = generateWellnessSummaryPrompt(transcription, extractedUserInfo);
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -654,7 +591,7 @@ WELLNESS SUMMARY:`;
         messages: [
           {
             role: 'system',
-            content: 'You are a professional wellness data analyst creating comprehensive health assessments.'
+            content: WELLNESS_SUMMARY_SYSTEM_PROMPT
           },
           {
             role: 'user',
@@ -662,7 +599,7 @@ WELLNESS SUMMARY:`;
           }
         ],
         temperature: 0.3,
-        max_tokens: 2000
+        max_tokens: 2500
       });
 
       return response.choices[0]?.message?.content || 'Unable to generate summary';
