@@ -112,7 +112,8 @@ npm run health
 - `/profile` - Show user profile information
 - `/logout` - Logout from system
 - `/interviews` - Show user's interviews
-- `/add_interview` - Add new interview result
+- `/save_interview` - Save current conversation to server
+- `/new_interview` - Start new interview session (reset current)
 - `/stats` - Show interview statistics
 - `/settings` - Bot settings
 - `/calendar` - Calendar settings (planned)

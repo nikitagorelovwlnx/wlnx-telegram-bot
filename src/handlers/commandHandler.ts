@@ -34,7 +34,8 @@ export class CommandHandler {
         if (!user.conversationActive) {
           userService.setUser(userInfo.id.toString(), {
             conversationActive: true,
-            conversationHistory: []
+            conversationHistory: [],
+            currentInterviewId: undefined  // Reset interview session for new conversation
           });
         }
         return;
@@ -242,6 +243,33 @@ export class CommandHandler {
     }
   }
 
+  // Start new interview session (reset current session)
+  static async startNewInterview(ctx: Context): Promise<void> {
+    try {
+      const userInfo = getUserInfo(ctx);
+      const user = userService.getUser(userInfo.id.toString());
+
+      if (!user?.isAuthenticated) {
+        await ctx.reply('❌ Вы не авторизованы. Используйте /start для входа.');
+        return;
+      }
+
+      // Reset current interview session
+      userService.setUser(userInfo.id.toString(), {
+        currentInterviewId: undefined,
+        conversationHistory: [],
+        conversationActive: true
+      });
+
+      await ctx.reply('🔄 Начата новая сессия интервью! Предыдущая сессия завершена.\n\nРасскажите о себе и своих целях в области здоровья и фитнеса.');
+
+      logUserAction(ctx, 'new_interview_session');
+
+    } catch (error) {
+      handleError(ctx, error, 'Ошибка при создании новой сессии интервью');
+    }
+  }
+
   // Save current conversation to server
   static async saveConversation(ctx: Context): Promise<void> {
     try {
@@ -413,33 +441,56 @@ export class CommandHandler {
             .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
             .join('\n\n');
           
-          // Check if wellness interview exists for this user
-          const interviews = await apiService.getWellnessInterviews(user.email);
-          let currentInterview = interviews.length > 0 ? interviews[0] : null;
+          // Use existing session or create new one only if none exists
+          let currentInterview = null;
+          
+          // Check if user already has a current session ID stored
+          if (user.currentInterviewId) {
+            try {
+              // Try to get the existing interview by ID
+              currentInterview = await apiService.getWellnessInterview(user.email, user.currentInterviewId);
+            } catch (error: any) {
+              // If interview not found, clear the stored ID
+              if (error.response?.status === 404) {
+                logger.warn('Stored interview ID not found, will create new', { interviewId: user.currentInterviewId });
+                userService.setUser(userInfo.id.toString(), { currentInterviewId: undefined });
+              }
+            }
+          }
           
           if (!currentInterview) {
-            // Create new wellness interview
+            // Create new wellness interview only if no current session exists
             currentInterview = await apiService.createWellnessInterview(user.email, {
               transcription: transcription,
               summary: wellnessSummary
             });
             
+            // Store the interview ID for future updates
+            userService.setUser(userInfo.id.toString(), { 
+              currentInterviewId: currentInterview.id 
+            });
+            
             // Notify user about auto-save (only for first save)
-            if (conversationHistory.length <= 4) {
-              setTimeout(() => {
-                ctx.reply('💾 Интервью автоматически сохранено на сервер! Теперь диалог будет обновляться в реальном времени.');
-              }, 2000);
-            }
+            setTimeout(() => {
+              ctx.reply('💾 Интервью автоматически сохранено на сервер! Теперь диалог будет обновляться в реальном времени.');
+            }, 2000);
+            
+            logger.info('Created new interview session', {
+              email: user.email,
+              interviewId: currentInterview.id,
+              conversationLength: conversationHistory.length
+            });
           } else {
-            // Update existing interview
+            // Update existing interview session
             await apiService.updateWellnessInterview(user.email, currentInterview.id, {
               transcription: transcription,
               summary: wellnessSummary
             });
             
-            // Silent update for real-time display (no notification for frequent updates)
-            logger.info('Auto-updated transcription for real-time display', {
+            // Silent update for real-time display
+            logger.info('Updated existing interview session', {
               email: user.email,
+              interviewId: currentInterview.id,
               conversationLength: conversationHistory.length,
               transcriptionLength: transcription.length
             });

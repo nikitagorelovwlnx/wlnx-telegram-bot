@@ -71,6 +71,7 @@ export interface BotUser {
   // Note: Wellness interview now handled through natural conversation
   conversationHistory?: ConversationMessage[];
   conversationActive?: boolean;
+  currentInterviewId?: string;  // Track current interview session ID for updates
   registrationStep?: 'name' | 'email' | 'password';
   extractedUserInfo?: {
     // Demographics and Baseline
