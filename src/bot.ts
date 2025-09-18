@@ -44,6 +44,7 @@ export class TelegramBot {
     // Main commands
     this.bot.command('start', CommandHandler.start);
     this.bot.command('save_interview', CommandHandler.saveConversation);
+    this.bot.command('new_interview', CommandHandler.startNewInterview);
     this.bot.command('help', CommandHandler.help);
     this.bot.command('settings', CommandHandler.settings);
 
