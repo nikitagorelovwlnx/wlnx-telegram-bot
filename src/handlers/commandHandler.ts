@@ -390,8 +390,8 @@ export class CommandHandler {
         extractedUserInfo: extractedInfo
       });
 
-      // Save to API with transcription and AI-generated summary
-      if (conversationHistory.length >= 6 && user?.email) { // Save after meaningful conversation
+      // Auto-save/update transcription after every exchange for real-time client display
+      if (user?.email && conversationHistory.length >= 2) { // Start saving from first exchange
         try {
           const { apiService } = await import('../services/apiService');
           
@@ -405,7 +405,7 @@ export class CommandHandler {
             extractedData: extractedInfo
           });
           
-          // Generate comprehensive wellness summary (now uses extracted data internally)
+          // Generate comprehensive wellness summary for each update (real-time summary)
           const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
           
           // Create transcription from conversation history
@@ -424,10 +424,12 @@ export class CommandHandler {
               summary: wellnessSummary
             });
             
-            // Notify user about auto-save
-            setTimeout(() => {
-              ctx.reply('💾 Интервью автоматически сохранено на сервер! (Можно также использовать /save_interview для ручного сохранения)');
-            }, 2000);
+            // Notify user about auto-save (only for first save)
+            if (conversationHistory.length <= 4) {
+              setTimeout(() => {
+                ctx.reply('💾 Интервью автоматически сохранено на сервер! Теперь диалог будет обновляться в реальном времени.');
+              }, 2000);
+            }
           } else {
             // Update existing interview
             await apiService.updateWellnessInterview(user.email, currentInterview.id, {
@@ -435,10 +437,12 @@ export class CommandHandler {
               summary: wellnessSummary
             });
             
-            // Notify user about auto-update
-            setTimeout(() => {
-              ctx.reply('💾 Интервью обновлено на сервере!');
-            }, 2000);
+            // Silent update for real-time display (no notification for frequent updates)
+            logger.info('Auto-updated transcription for real-time display', {
+              email: user.email,
+              conversationLength: conversationHistory.length,
+              transcriptionLength: transcription.length
+            });
           }
         } catch (apiError: any) {
           // Don't break conversation if API fails

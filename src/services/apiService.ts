@@ -200,6 +200,7 @@ class ApiService {
     email: string,
     interviewData: Omit<WellnessInterview, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<WellnessInterview> {
+    console.log('🚀 START createWellnessInterview called with:', { email, hasTranscription: !!interviewData.transcription, hasSummary: !!interviewData.summary });
     const requestData = {
       email,
       transcription: interviewData.transcription,
@@ -213,18 +214,45 @@ class ApiService {
       summaryLength: requestData.summary?.length || 0,
       transcriptionPreview: requestData.transcription?.substring(0, 100) + '...',
       summaryPreview: requestData.summary?.substring(0, 100) + '...',
-      url: '/api/interviews',
-      method: 'POST'
+      url: '/interviews',
+      method: 'POST',
+      baseURL: this.api.defaults.baseURL,
+      fullURL: `${this.api.defaults.baseURL}/interviews`
     });
     
     console.log('Full request data:', JSON.stringify(requestData, null, 2));
+    console.log('Axios config:', {
+      baseURL: this.api.defaults.baseURL,
+      timeout: this.api.defaults.timeout,
+      headers: this.api.defaults.headers
+    });
     
-    const response: AxiosResponse<WellnessInterview> = await this.api.post('/api/interviews', requestData);
-    return response.data;
+    try {
+      const response: AxiosResponse<WellnessInterview> = await this.api.post('/interviews', requestData);
+      console.log('✅ API Response Success:', {
+        status: response.status,
+        statusText: response.statusText,
+        dataKeys: Object.keys(response.data)
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ API Request Failed:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+        fullURL: `${error.config?.baseURL}${error.config?.url}`,
+        responseData: error.response?.data,
+        requestData: requestData
+      });
+      throw error;
+    }
   }
 
   async getWellnessInterviews(email: string): Promise<WellnessInterview[]> {
-    const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/api/interviews', {
+    const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/interviews', {
       params: { email }
     });
     return response.data;
@@ -235,7 +263,7 @@ class ApiService {
     id: string,
     interviewData: Partial<WellnessInterview>
   ): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.put(`/api/interviews/${id}`, {
+    const response: AxiosResponse<WellnessInterview> = await this.api.put(`/interviews/${id}`, {
       email,
       ...interviewData
     });
@@ -243,21 +271,21 @@ class ApiService {
   }
 
   async getWellnessInterview(email: string, id: string): Promise<WellnessInterview> {
-    const response: AxiosResponse<WellnessInterview> = await this.api.get(`/api/interviews/${id}`, {
+    const response: AxiosResponse<WellnessInterview> = await this.api.get(`/interviews/${id}`, {
       params: { email }
     });
     return response.data;
   }
 
   async deleteWellnessInterview(email: string, id: string): Promise<void> {
-    await this.api.delete(`/api/interviews/${id}`, {
+    await this.api.delete(`/interviews/${id}`, {
       data: { email }
     });
   }
 
   // New endpoint: Get all users with complete session history
   async getAllUsersWithSessions(): Promise<any> {
-    const response: AxiosResponse<any> = await this.api.get('/api/users');
+    const response: AxiosResponse<any> = await this.api.get('/users');
     return response.data;
   }
 }
