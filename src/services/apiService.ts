@@ -216,15 +216,15 @@ class ApiService {
       summaryPreview: requestData.summary?.substring(0, 100) + '...',
       url: '/interviews',
       method: 'POST',
-      baseURL: this.api.defaults.baseURL,
-      fullURL: `${this.api.defaults.baseURL}/interviews`
+      baseURL: this.api.defaults?.baseURL || 'http://localhost:3000/api',
+      fullURL: `${this.api.defaults?.baseURL || 'http://localhost:3000/api'}/interviews`
     });
     
     console.log('Full request data:', JSON.stringify(requestData, null, 2));
     console.log('Axios config:', {
-      baseURL: this.api.defaults.baseURL,
-      timeout: this.api.defaults.timeout,
-      headers: this.api.defaults.headers
+      baseURL: this.api.defaults?.baseURL || 'http://localhost:3000/api',
+      timeout: this.api.defaults?.timeout || 10000,
+      headers: this.api.defaults?.headers || {}
     });
     
     try {

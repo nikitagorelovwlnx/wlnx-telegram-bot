@@ -63,7 +63,7 @@ describe('ApiService', () => {
         });
 
         expect(result).toEqual(mockWellnessInterview);
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/api/interviews', {
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/interviews', {
           email: 'test@example.com',
           transcription: 'Test transcription',
           summary: 'Test summary'
@@ -86,7 +86,7 @@ describe('ApiService', () => {
             email: 'test@example.com',
             transcriptionLength: 18,
             summaryLength: 12,
-            url: '/api/interviews'
+            url: '/interviews'
           })
         );
 
@@ -118,7 +118,7 @@ describe('ApiService', () => {
         const result = await apiService.getWellnessInterviews('test@example.com');
 
         expect(result).toEqual([mockWellnessInterview]);
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/interviews', {
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/interviews', {
           params: { email: 'test@example.com' }
         });
       });
@@ -138,7 +138,7 @@ describe('ApiService', () => {
 
         expect(result).toEqual(updatedInterview);
         expect(mockAxiosInstance.put).toHaveBeenCalledWith(
-          '/api/interviews/interview-123',
+          '/interviews/interview-123',
           { 
             email: 'test@example.com',
             summary: 'Updated summary' 
@@ -153,7 +153,7 @@ describe('ApiService', () => {
 
         await apiService.deleteWellnessInterview('test@example.com', 'interview-123');
 
-        expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/api/interviews/interview-123', {
+        expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/interviews/interview-123', {
           data: { email: 'test@example.com' }
         });
       });
@@ -176,7 +176,7 @@ describe('ApiService', () => {
         const result = await apiService.getAllUsersWithSessions();
 
         expect(result).toEqual(mockUsersData);
-        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/users');
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith('/users');
       });
     });
   });
