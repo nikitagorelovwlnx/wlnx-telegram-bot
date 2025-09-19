@@ -250,7 +250,7 @@ export class CommandHandler {
       const user = userService.getUser(userInfo.id.toString());
 
       if (!user?.isAuthenticated) {
-        await ctx.reply('❌ Вы не авторизованы. Используйте /start для входа.');
+        await ctx.reply('❌ You are not authenticated. Use /start to login.');
         return;
       }
 
@@ -261,12 +261,12 @@ export class CommandHandler {
         conversationActive: true
       });
 
-      await ctx.reply('🔄 Начата новая сессия интервью! Предыдущая сессия завершена.\n\nРасскажите о себе и своих целях в области здоровья и фитнеса.');
+      await ctx.reply('🔄 New interview session started! Previous session completed.\n\nTell me about yourself and your health and fitness goals.');
 
       logUserAction(ctx, 'new_interview_session');
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при создании новой сессии интервью');
+      handleError(ctx, error, 'Error creating new interview session');
     }
   }
 
@@ -278,23 +278,23 @@ export class CommandHandler {
       const { conversationService } = await import('../services/conversationService');
 
       if (!user?.isAuthenticated) {
-        await ctx.reply('❌ Вы не авторизованы. Используйте /start для входа.');
+        await ctx.reply('❌ You are not authenticated. Use /start to login.');
         return;
       }
 
       const conversationHistory = user?.conversationHistory || [];
       
       if (conversationHistory.length === 0) {
-        await ctx.reply('💬 Пока нет разговора для сохранения. Начните общение!');
+        await ctx.reply('💬 No conversation to save yet. Start chatting!');
         return;
       }
 
       if (!user.email) {
-        await ctx.reply('❌ Email не найден. Зарегистрируйтесь заново с помощью /start.');
+        await ctx.reply('❌ Email not found. Please register again using /start.');
         return;
       }
 
-      await ctx.reply('⏳ Сохраняю результаты интервью на сервер...');
+      await ctx.reply('⏳ Saving interview results to server...');
 
       try {
         const { apiService } = await import('../services/apiService');
@@ -327,14 +327,14 @@ export class CommandHandler {
             transcription: transcription,
             summary: wellnessSummary
           });
-          await ctx.reply('✅ Новое интервью создано и сохранено на сервере!');
+          await ctx.reply('✅ New interview created and saved to server!');
         } else {
           // Update existing interview
           await apiService.updateWellnessInterview(user.email, currentInterview.id, {
             transcription: transcription,
             summary: wellnessSummary
           });
-          await ctx.reply('✅ Интервью обновлено на сервере!');
+          await ctx.reply('✅ Interview updated on server!');
         }
 
         logUserAction(ctx, 'manual_conversation_save', {
@@ -352,26 +352,26 @@ export class CommandHandler {
           errorResponse: apiError.response?.data
         });
         
-        let errorMessage = '❌ Ошибка при сохранении на сервер:\n';
+        let errorMessage = '❌ Error saving to server:\n';
         
         if (apiError.status === 400) {
-          errorMessage += 'Неверный формат данных.\n';
+          errorMessage += 'Invalid data format.\n';
           if (apiError.response?.data?.error) {
-            errorMessage += `Детали: ${apiError.response.data.error}\n`;
+            errorMessage += `Details: ${apiError.response.data.error}\n`;
           }
         } else if (apiError.code === 'ECONNREFUSED') {
-          errorMessage += 'API сервер недоступен. Проверьте, что сервер запущен на http://localhost:3000\n';
+          errorMessage += 'API server unavailable. Check that server is running on http://localhost:3000\n';
         } else {
-          errorMessage += `${apiError.message || 'Неизвестная ошибка'}\n`;
+          errorMessage += `${apiError.message || 'Unknown error'}\n`;
         }
         
-        errorMessage += '\nПопробуйте позже или проверьте подключение к серверу.';
+        errorMessage += '\nTry again later or check server connection.';
         
         await ctx.reply(errorMessage);
       }
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при сохранении разговора');
+      handleError(ctx, error, 'Error saving conversation');
     }
   }
 
@@ -444,25 +444,55 @@ export class CommandHandler {
           // Use existing session or create new one only if none exists
           let currentInterview = null;
           
+          logger.info('🔍 Session check:', { 
+            email: user.email,
+            hasCurrentInterviewId: !!user.currentInterviewId,
+            currentInterviewId: user.currentInterviewId,
+            conversationLength: conversationHistory.length
+          });
+          
           // Check if user already has a current session ID stored
           if (user.currentInterviewId) {
             try {
+              logger.info('📝 Attempting to fetch existing interview:', { interviewId: user.currentInterviewId });
               // Try to get the existing interview by ID
               currentInterview = await apiService.getWellnessInterview(user.email, user.currentInterviewId);
+              logger.info('✅ Found existing interview:', { 
+                interviewId: currentInterview.id,
+                email: user.email
+              });
             } catch (error: any) {
               // If interview not found, clear the stored ID
+              logger.error('❌ Failed to fetch existing interview:', {
+                interviewId: user.currentInterviewId,
+                error: error.message,
+                status: error.response?.status
+              });
               if (error.response?.status === 404) {
-                logger.warn('Stored interview ID not found, will create new', { interviewId: user.currentInterviewId });
+                logger.warn('🗑️ Stored interview ID not found, will create new', { interviewId: user.currentInterviewId });
                 userService.setUser(userInfo.id.toString(), { currentInterviewId: undefined });
               }
             }
+          } else {
+            logger.info('🆕 No current interview ID stored, will create new session');
           }
           
           if (!currentInterview) {
             // Create new wellness interview only if no current session exists
+            logger.info('🆕 About to CREATE new interview session (POST request):', {
+              email: user.email,
+              method: 'POST',
+              endpoint: '/interviews'
+            });
+            
             currentInterview = await apiService.createWellnessInterview(user.email, {
               transcription: transcription,
               summary: wellnessSummary
+            });
+            
+            logger.info('📝 Storing interview ID for future updates:', {
+              userId: userInfo.id.toString(),
+              interviewId: currentInterview.id
             });
             
             // Store the interview ID for future updates
@@ -470,25 +500,39 @@ export class CommandHandler {
               currentInterviewId: currentInterview.id 
             });
             
+            // Verify storage worked
+            const updatedUser = userService.getUser(userInfo.id.toString());
+            logger.info('✅ Verified stored interview ID:', {
+              storedInterviewId: updatedUser?.currentInterviewId,
+              matches: updatedUser?.currentInterviewId === currentInterview.id
+            });
+            
             // Notify user about auto-save (only for first save)
             setTimeout(() => {
-              ctx.reply('💾 Интервью автоматически сохранено на сервер! Теперь диалог будет обновляться в реальном времени.');
+              ctx.reply('💾 Interview automatically saved to server! Dialog will now update in real-time.');
             }, 2000);
             
-            logger.info('Created new interview session', {
+            logger.info('✅ Successfully CREATED new interview session', {
               email: user.email,
               interviewId: currentInterview.id,
               conversationLength: conversationHistory.length
             });
           } else {
             // Update existing interview session
+            logger.info('🔄 About to UPDATE existing interview session (PUT request):', {
+              email: user.email,
+              interviewId: currentInterview.id,
+              method: 'PUT',
+              endpoint: `/interviews/${currentInterview.id}`
+            });
+            
             await apiService.updateWellnessInterview(user.email, currentInterview.id, {
               transcription: transcription,
               summary: wellnessSummary
             });
             
             // Silent update for real-time display
-            logger.info('Updated existing interview session', {
+            logger.info('✅ Successfully UPDATED existing interview session', {
               email: user.email,
               interviewId: currentInterview.id,
               conversationLength: conversationHistory.length,

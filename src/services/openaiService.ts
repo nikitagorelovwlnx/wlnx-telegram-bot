@@ -123,8 +123,8 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
 
     const allText = userMessages.join(' ');
 
-    // Извлечение возраста
-    const ageMatch = allText.match(/(\d{1,2})\s*(лет|года|год|years?|y\.?o\.?)/i);
+    // Age extraction
+    const ageMatch = allText.match(/(\d{1,2})\s*(years?|y\.?o\.?|лет|года|год)/i);
     if (ageMatch) {
       const age = parseInt(ageMatch[1]);
       if (age >= 10 && age <= 120) {
@@ -132,12 +132,15 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
       }
     }
 
-    // Извлечение местоположения
+    // Location extraction
     const locationPatterns = [
+      /live in (.+?)(?:\s|$|,|\.|!|\?)/i,
+      /from (.+?)(?:\s|$|,|\.|!|\?)/i,
+      /city (.+?)(?:\s|$|,|\.|!|\?)/i,
       /живу в (.+?)(?:\s|$|,|\.|!|\?)/i,
       /из (.+?)(?:\s|$|,|\.|!|\?)/i,
       /город (.+?)(?:\s|$|,|\.|!|\?)/i,
-      /(москва|спб|санкт-петербург|екатеринбург|новосибирск|казань|нижний новгород|челябинск|самара|омск|ростов|уфа|красноярск|воронеж|пермь|волгоград)/i
+      /(new york|london|paris|berlin|tokyo|moscow|москва|спб|санкт-петербург)/i
     ];
 
     for (const pattern of locationPatterns) {
@@ -148,8 +151,11 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
       }
     }
 
-    // Извлечение противопоказаний
+    // Health contraindications extraction
     const contraindicationKeywords = [
+      'allergy', 'diabetes', 'hypertension', 'asthma', 'arthritis', 'migraine',
+      'heart problems', 'disease', 'limitations', 'contraindications',
+      'cannot', 'forbidden', 'illness', 'treatment', 'medication', 'pills',
       'аллергия', 'диабет', 'гипертония', 'астма', 'артрит', 'мигрень',
       'проблемы с сердцем', 'заболевания', 'ограничения', 'противопоказания',
       'не могу', 'нельзя', 'запрещено', 'болезнь', 'лечение', 'таблетки'
@@ -168,8 +174,10 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
       });
     });
 
-    // Извлечение целей здоровья
+    // Health goals extraction
     const goalKeywords = [
+      'want to', 'goal', 'lose weight', 'gain weight', 'muscle', 'endurance',
+      'health', 'fitness', 'sport', 'workout', 'nutrition', 'sleep',
       'хочу', 'цель', 'похудеть', 'набрать вес', 'мышцы', 'выносливость',
       'здоровье', 'фитнес', 'спорт', 'тренировки', 'питание', 'сон'
     ];
@@ -187,8 +195,10 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
       });
     });
 
-    // Извлечение факторов образа жизни
+    // Lifestyle factors extraction
     const lifestyleKeywords = [
+      'work', 'sleep', 'eat', 'exercise', 'smoke', 'drink', 'stress',
+      'activity', 'sedentary', 'office', 'sport', 'walk',
       'работаю', 'сплю', 'ем', 'тренируюсь', 'курю', 'пью', 'стресс',
       'активность', 'сидячий', 'офис', 'спорт', 'прогулки'
     ];
@@ -206,7 +216,7 @@ Start with a friendly greeting and introduce yourself as a wellness coach. Expla
       });
     });
 
-    // Удаляем дубликаты
+    // Remove duplicates
     statistics.contraindications = [...new Set(statistics.contraindications)];
     statistics.health_goals = [...new Set(statistics.health_goals)];
     statistics.lifestyle_factors = [...new Set(statistics.lifestyle_factors)];
