@@ -548,7 +548,7 @@ class EnhancedConversationService {
         .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
         .join('\n\n');
 
-      const prompt = generateWellnessSummaryPrompt(transcription, extractedUserInfo);
+      const prompt = generateWellnessSummaryPrompt(extractedUserInfo, transcription);
       
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4',
@@ -571,4 +571,4 @@ class EnhancedConversationService {
   }
 }
 
-export const conversationService = new EnhancedConversationService();
+export const enhancedConversationService = new EnhancedConversationService();

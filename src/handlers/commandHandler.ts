@@ -411,7 +411,7 @@ export class CommandHandler {
       };
       conversationHistory.push(aiMessage);
 
-      // Extract user info from conversation
+      // Extract user info from conversation (single call)
       const extractedInfo = conversationService.extractUserInfo(conversationHistory);
 
       // Update user with new conversation history and extracted info
@@ -425,8 +425,8 @@ export class CommandHandler {
         try {
           const { apiService } = await import('../services/apiService');
           
-          // Extract structured wellness data
-          const wellnessData = conversationService.extractUserInfo(conversationHistory);
+          // Use the same extracted data for wellness_data
+          const wellnessData = extractedInfo;
           logger.info('Extracted wellness data before summary generation:', {
             extractedFields: Object.keys(wellnessData).filter(key => {
               const value = (wellnessData as any)[key];
