@@ -78,8 +78,7 @@ describe('CommandHandler', () => {
       await CommandHandler.start(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Привет! Я Anna'),
-        expect.any(Object)
+        expect.stringContaining('Hey! 😊 I\'m Anna')
       );
       expect(mockUserService.setUser).toHaveBeenCalledWith(
         '123456789',
@@ -97,8 +96,7 @@ describe('CommandHandler', () => {
       await CommandHandler.start(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('С возвращением!'),
-        expect.any(Object)
+        expect.stringContaining('Hey there! 😊')
       );
     });
 
@@ -112,7 +110,7 @@ describe('CommandHandler', () => {
       await CommandHandler.start(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('продолжим регистрацию')
+        expect.stringContaining('Hey! 😊 I\'m Anna')
       );
     });
   });
@@ -215,31 +213,51 @@ describe('CommandHandler', () => {
     });
 
     it('should save conversation manually', async () => {
+      // Mock authenticated user with conversation history
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        isAuthenticated: true,
+        email: 'test@example.com',
+        conversationHistory: mockConversationHistory
+      } as any);
+
       mockConversationService.extractUserInfo.mockReturnValue({
         age: 25,
         weight: 65
       } as any);
-      mockConversationService.generateWellnessSummary.mockResolvedValue('Manual save summary');
+      mockConversationService.generateWellnessSummary.mockResolvedValue('Wellness summary');
       mockApiService.getWellnessInterviews.mockResolvedValue([]);
       mockApiService.createWellnessInterview.mockResolvedValue({} as any);
 
       await CommandHandler.saveConversation(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Сохраняю результаты')
+        expect.stringContaining('Saving interview results')
       );
       expect(mockApiService.createWellnessInterview).toHaveBeenCalledWith(
         'test@example.com',
         expect.objectContaining({
-          summary: 'Manual save summary'
+          summary: 'Wellness summary',
+          wellness_data: expect.objectContaining({
+            age: 25,
+            weight: 65
+          })
         })
       );
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('создано и сохранено')
+        expect.stringContaining('New interview created')
       );
     });
 
     it('should update existing interview', async () => {
+      // Mock authenticated user
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        isAuthenticated: true,
+        email: 'test@example.com',
+        conversationHistory: mockConversationHistory
+      } as any);
+
       const existingInterview = {
         id: 'existing-id',
         user_id: 'user-123',
@@ -260,7 +278,8 @@ describe('CommandHandler', () => {
         'test@example.com',
         'existing-id',
         expect.objectContaining({
-          summary: 'Updated summary'
+          summary: 'Updated summary',
+          wellness_data: {}
         })
       );
       expect(mockCtx.reply).toHaveBeenCalledWith(
@@ -279,7 +298,7 @@ describe('CommandHandler', () => {
       await CommandHandler.saveConversation(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Ошибка при сохранении')
+        expect.stringContaining('Error saving')
       );
     });
 
@@ -292,7 +311,7 @@ describe('CommandHandler', () => {
       await CommandHandler.saveConversation(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Email не найден')
+        expect.stringContaining('Email not found')
       );
     });
 
@@ -306,7 +325,7 @@ describe('CommandHandler', () => {
       await CommandHandler.saveConversation(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('нет разговора для сохранения')
+        expect.stringContaining('No conversation to save')
       );
     });
   });

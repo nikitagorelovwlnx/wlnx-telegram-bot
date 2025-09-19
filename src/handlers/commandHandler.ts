@@ -299,14 +299,14 @@ export class CommandHandler {
       try {
         const { apiService } = await import('../services/apiService');
         
-        // Extract user info for logging
-        const extractedInfo = conversationService.extractUserInfo(conversationHistory);
-        logger.info('Manual save - Extracted wellness data before summary generation:', {
-          extractedFields: Object.keys(extractedInfo).filter(key => {
-            const value = (extractedInfo as any)[key];
+        // Extract structured wellness data
+        const wellnessData = conversationService.extractUserInfo(conversationHistory);
+        logger.info('Manual save - Extracted wellness data:', {
+          extractedFields: Object.keys(wellnessData).filter(key => {
+            const value = (wellnessData as any)[key];
             return value !== undefined && value !== null && value !== '';
           }),
-          extractedData: extractedInfo
+          wellnessData: wellnessData
         });
         
         // Generate comprehensive wellness summary (now uses extracted data internally)
@@ -325,14 +325,16 @@ export class CommandHandler {
           // Create new wellness interview
           currentInterview = await apiService.createWellnessInterview(user.email, {
             transcription: transcription,
-            summary: wellnessSummary
+            summary: wellnessSummary,
+            wellness_data: wellnessData
           });
           await ctx.reply('✅ New interview created and saved to server!');
         } else {
           // Update existing interview
           await apiService.updateWellnessInterview(user.email, currentInterview.id, {
             transcription: transcription,
-            summary: wellnessSummary
+            summary: wellnessSummary,
+            wellness_data: wellnessData
           });
           await ctx.reply('✅ Interview updated on server!');
         }
@@ -423,14 +425,14 @@ export class CommandHandler {
         try {
           const { apiService } = await import('../services/apiService');
           
-          // Extract user info for logging
-          const extractedInfo = conversationService.extractUserInfo(conversationHistory);
+          // Extract structured wellness data
+          const wellnessData = conversationService.extractUserInfo(conversationHistory);
           logger.info('Extracted wellness data before summary generation:', {
-            extractedFields: Object.keys(extractedInfo).filter(key => {
-              const value = (extractedInfo as any)[key];
+            extractedFields: Object.keys(wellnessData).filter(key => {
+              const value = (wellnessData as any)[key];
               return value !== undefined && value !== null && value !== '';
             }),
-            extractedData: extractedInfo
+            wellnessData: wellnessData
           });
           
           // Generate comprehensive wellness summary for each update (real-time summary)
@@ -487,7 +489,8 @@ export class CommandHandler {
             
             currentInterview = await apiService.createWellnessInterview(user.email, {
               transcription: transcription,
-              summary: wellnessSummary
+              summary: wellnessSummary,
+              wellness_data: wellnessData
             });
             
             logger.info('📝 Storing interview ID for future updates:', {
@@ -528,7 +531,8 @@ export class CommandHandler {
             
             await apiService.updateWellnessInterview(user.email, currentInterview.id, {
               transcription: transcription,
-              summary: wellnessSummary
+              summary: wellnessSummary,
+              wellness_data: wellnessData
             });
             
             // Silent update for real-time display
