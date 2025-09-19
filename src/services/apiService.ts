@@ -300,9 +300,15 @@ class ApiService {
   }
 
   async deleteWellnessInterview(email: string, id: string): Promise<void> {
-    await this.api.delete(`/interviews/${id}`, {
-      data: { email }
-    });
+    try {
+      await this.api.delete(`/interviews/${id}`, {
+        params: { email }
+      });
+      console.log(`✅ Successfully deleted interview ${id} for ${email}`);
+    } catch (error) {
+      console.error(`❌ Failed to delete interview ${id} for ${email}:`, error);
+      throw error;
+    }
   }
 
   // New endpoint: Get all users with complete session history
