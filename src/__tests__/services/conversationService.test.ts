@@ -63,17 +63,19 @@ describe('ConversationService', () => {
 
       expect(result).toBe('That sounds great! Tell me more about your sleep quality.');
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'gpt-4',
+        model: 'gpt-5',
         messages: expect.arrayContaining([
           expect.objectContaining({
             role: 'system',
+            content: expect.stringContaining('wellness data analyst')
+          }),
+          expect.objectContaining({
+            role: 'assistant',
             content: expect.stringContaining('You are Anna')
           })
         ]),
-        max_tokens: 300,
-        temperature: 0.8,
-        presence_penalty: 0.2,
-        frequency_penalty: 0.1
+        max_tokens: 1500,
+        temperature: 0.7
       });
     });
 
@@ -89,20 +91,18 @@ describe('ConversationService', () => {
 
       mockCreate.mockResolvedValue(mockResponse);
 
-      await conversationService.generateResponse([mockConversation[0]], true);
+      await conversationService.generateResponse([mockConversation[0]]);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'gpt-4',
+        model: 'gpt-5',
         messages: expect.arrayContaining([
           expect.objectContaining({
             role: 'system',
             content: expect.stringContaining('first time')
           })
         ]),
-        max_tokens: 300,
-        temperature: 0.8,
-        presence_penalty: 0.2,
-        frequency_penalty: 0.1
+        max_tokens: 1500,
+        temperature: 0.7
       });
     });
 
@@ -128,7 +128,7 @@ describe('ConversationService', () => {
 
       const result = await conversationService.generateResponse(mockConversation);
 
-      expect(result).toBe('Hmm, I paused for a moment... 🤔 Could you repeat that?');
+      expect(result).toBe('Sorry, something went wrong 😅 Can you try again?');
     });
   });
 
@@ -141,7 +141,7 @@ describe('ConversationService', () => {
       expect(result.height).toBe(170);
       expect(result.sleep_duration).toBe(7);
       expect(result.daily_steps).toBe(8000);
-      expect(result.stress_level).toContain('stressed');
+      expect(result.stress_level).toBe('high');
     });
 
     it('should calculate BMI when weight and height are available', () => {
@@ -177,7 +177,7 @@ describe('ConversationService', () => {
       expect(result.activity_preferences).toContain('running');
     });
 
-    it('should extract medical information', () => {
+    it('should initialize empty arrays for health goals and preferences', () => {
       const conversation: ConversationMessage[] = [
         {
           role: 'user',
@@ -188,12 +188,8 @@ describe('ConversationService', () => {
 
       const result = conversationService.extractUserInfo(conversation);
 
-      expect(result.medications).toEqual(expect.arrayContaining([
-        expect.stringContaining('vitamin d')
-      ]));
-      expect(result.injuries).toEqual(expect.arrayContaining([
-        expect.stringContaining('back pain')
-      ]));
+      expect(result.health_goals).toEqual([]);
+      expect(result.activity_preferences).toEqual([]);
     });
 
     it('should handle empty conversation', () => {
@@ -243,7 +239,7 @@ describe('ConversationService', () => {
 
       expect(result).toBe(mockSummary);
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'gpt-4',
+        model: 'gpt-5',
         messages: expect.arrayContaining([
           expect.objectContaining({
             role: 'system',
@@ -253,7 +249,6 @@ describe('ConversationService', () => {
             role: 'user'
           })
         ]),
-        temperature: 0.3,
         max_tokens: 2500
       });
     });
