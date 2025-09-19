@@ -49,12 +49,24 @@ class EnhancedConversationService {
         });
       });
 
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: messages as any,
-        max_tokens: 1500,
-        temperature: 0.7
-      });
+      // Try GPT-5 first, fallback to GPT-4 if it fails
+      let response;
+      try {
+        response = await this.openai.chat.completions.create({
+          model: 'gpt-5',
+          messages: messages as any,
+          max_completion_tokens: 1500, // GPT-5 uses max_completion_tokens
+          temperature: 0.7
+        });
+      } catch (modelError) {
+        logger.warn('GPT-5 failed, falling back to GPT-4:', modelError);
+        response = await this.openai.chat.completions.create({
+          model: 'gpt-4',
+          messages: messages as any,
+          max_tokens: 1500,
+          temperature: 0.7
+        });
+      }
 
       const assistantMessage = response.choices[0]?.message?.content;
       if (!assistantMessage) {
@@ -65,6 +77,26 @@ class EnhancedConversationService {
 
     } catch (error) {
       logger.error('Error generating conversation response', error);
+      
+      // More specific error handling for debugging
+      if (error instanceof Error) {
+        logger.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        // Check for specific OpenAI errors
+        if (error.message.includes('model') && error.message.includes('gpt-5')) {
+          logger.warn('GPT-5 model not available, falling back to GPT-4');
+          // Could implement fallback here
+        }
+        
+        if (error.message.includes('API key')) {
+          logger.error('OpenAI API key issue detected');
+        }
+      }
+      
       return 'Sorry, something went wrong 😅 Can you try again?';
     }
   }
@@ -550,14 +582,28 @@ class EnhancedConversationService {
 
       const prompt = generateWellnessSummaryPrompt(transcription, extractedUserInfo);
       
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: WELLNESS_SUMMARY_SYSTEM_PROMPT },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2500
-      });
+      // Try GPT-5 first, fallback to GPT-4 if it fails
+      let response;
+      try {
+        response = await this.openai.chat.completions.create({
+          model: 'gpt-5',
+          messages: [
+            { role: 'system', content: WELLNESS_SUMMARY_SYSTEM_PROMPT },
+            { role: 'user', content: prompt }
+          ],
+          max_completion_tokens: 2500 // GPT-5 uses max_completion_tokens
+        });
+      } catch (modelError) {
+        logger.warn('GPT-5 failed in summary, falling back to GPT-4:', modelError);
+        response = await this.openai.chat.completions.create({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: WELLNESS_SUMMARY_SYSTEM_PROMPT },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 2500
+        });
+      }
 
       return response.choices[0]?.message?.content || 'Unable to generate summary';
     } catch (error) {
