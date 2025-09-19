@@ -180,7 +180,7 @@ describe('ApiService', () => {
         await apiService.deleteWellnessInterview('test@example.com', 'interview-123');
 
         expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/interviews/interview-123', {
-          params: { email: 'test@example.com' }
+          data: { email: 'test@example.com' }
         });
       });
     });

@@ -301,8 +301,9 @@ class ApiService {
 
   async deleteWellnessInterview(email: string, id: string): Promise<void> {
     try {
+      // ⚠️ FIX: API expects email in request body, not query params
       await this.api.delete(`/interviews/${id}`, {
-        params: { email }
+        data: { email }  // Send email in request body
       });
       console.log(`✅ Successfully deleted interview ${id} for ${email}`);
     } catch (error) {
