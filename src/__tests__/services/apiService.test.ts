@@ -66,7 +66,8 @@ describe('ApiService', () => {
         expect(mockAxiosInstance.post).toHaveBeenCalledWith('/interviews', {
           email: 'test@example.com',
           transcription: 'Test transcription',
-          summary: 'Test summary'
+          summary: 'Test summary',
+          wellness_data: undefined  // Allow for wellness_data field
         });
       });
 
@@ -97,7 +98,7 @@ describe('ApiService', () => {
         const apiError = new Error('API Error');
         (apiError as any).response = {
           status: 400,
-          data: { message: 'Invalid data' }
+          data: { error: 'Invalid data' }
         };
         mockAxiosInstance.post.mockRejectedValue(apiError);
 
@@ -105,6 +106,31 @@ describe('ApiService', () => {
           transcription: 'Test',
           summary: 'Test'
         })).rejects.toThrow('API Error');
+      });
+
+      it('should send wellness_data when provided', async () => {
+        const mockResponse = { data: mockWellnessInterview };
+        mockAxiosInstance.post.mockResolvedValue(mockResponse);
+
+        const wellnessData = {
+          age: 30,
+          weight: 70,
+          health_goals: ['lose weight', 'improve fitness']
+        };
+
+        const result = await apiService.createWellnessInterview('test@example.com', {
+          transcription: 'Test transcription',
+          summary: 'Test summary',
+          wellness_data: wellnessData
+        });
+
+        expect(result).toEqual(mockWellnessInterview);
+        expect(mockAxiosInstance.post).toHaveBeenCalledWith('/interviews', {
+          email: 'test@example.com',
+          transcription: 'Test transcription',
+          summary: 'Test summary',
+          wellness_data: wellnessData
+        });
       });
     });
 

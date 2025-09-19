@@ -200,11 +200,17 @@ class ApiService {
     email: string,
     interviewData: Omit<WellnessInterview, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<WellnessInterview> {
-    console.log('🚀 START createWellnessInterview called with:', { email, hasTranscription: !!interviewData.transcription, hasSummary: !!interviewData.summary });
+    console.log('🚀 START createWellnessInterview called with:', { 
+      email, 
+      hasTranscription: !!interviewData.transcription, 
+      hasSummary: !!interviewData.summary,
+      hasWellnessData: !!interviewData.wellness_data 
+    });
     const requestData = {
       email,
       transcription: interviewData.transcription,
-      summary: interviewData.summary
+      summary: interviewData.summary,
+      wellness_data: interviewData.wellness_data
     };
     
     // Debug logging
@@ -212,6 +218,10 @@ class ApiService {
       email: requestData.email,
       transcriptionLength: requestData.transcription?.length || 0,
       summaryLength: requestData.summary?.length || 0,
+      wellnessDataFields: requestData.wellness_data ? Object.keys(requestData.wellness_data).filter(key => 
+        requestData.wellness_data![key as keyof typeof requestData.wellness_data] !== undefined && 
+        requestData.wellness_data![key as keyof typeof requestData.wellness_data] !== null
+      ) : [],
       transcriptionPreview: requestData.transcription?.substring(0, 100) + '...',
       summaryPreview: requestData.summary?.substring(0, 100) + '...',
       url: '/interviews',
@@ -263,6 +273,18 @@ class ApiService {
     id: string,
     interviewData: Partial<WellnessInterview>
   ): Promise<WellnessInterview> {
+    console.log('🔄 Updating wellness interview:', {
+      id,
+      email,
+      hasTranscription: !!interviewData.transcription,
+      hasSummary: !!interviewData.summary,
+      hasWellnessData: !!interviewData.wellness_data,
+      wellnessDataFields: interviewData.wellness_data ? Object.keys(interviewData.wellness_data).filter(key => 
+        interviewData.wellness_data![key as keyof typeof interviewData.wellness_data] !== undefined && 
+        interviewData.wellness_data![key as keyof typeof interviewData.wellness_data] !== null
+      ) : []
+    });
+
     const response: AxiosResponse<WellnessInterview> = await this.api.put(`/interviews/${id}`, {
       email,
       ...interviewData

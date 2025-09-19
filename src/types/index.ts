@@ -130,11 +130,63 @@ export interface ApiError {
   code?: string;
 }
 
+// Structured wellness data extracted from conversation
+export interface WellnessData {
+  // Demographics and Baseline
+  age?: number;
+  gender?: string;
+  weight?: number;
+  height?: number;
+  bmi?: number;
+  waist_circumference?: number;
+  location?: string;
+  timezone?: string;
+  
+  // Biometrics and Habits
+  daily_steps?: number;
+  sleep_duration?: number;
+  sleep_quality?: string;
+  sleep_regularity?: string;
+  hrv?: number;
+  resting_heart_rate?: number;
+  stress_level?: string;
+  hydration_level?: string;
+  nutrition_habits?: string[];
+  caffeine_intake?: string;
+  alcohol_intake?: string;
+  
+  // Lifestyle Context
+  work_schedule?: string;
+  workload?: string;
+  business_travel?: boolean;
+  night_shifts?: boolean;
+  cognitive_load?: string;
+  family_obligations?: string[];
+  recovery_resources?: string[];
+  
+  // Medical History
+  chronic_conditions?: string[];
+  injuries?: string[];
+  contraindications?: string[];
+  medications?: string[];
+  supplements?: string[];
+  
+  // Personal Goals and Preferences
+  health_goals?: string[];
+  motivation_level?: string;
+  morning_evening_type?: string;
+  activity_preferences?: string[];
+  coaching_style_preference?: string;
+  lifestyle_factors?: string[];
+  interests?: string[];
+}
+
 export interface WellnessInterview {
   id: string;
   user_id: string;
   transcription: string;
   summary: string;
+  wellness_data?: WellnessData;  // New field for structured wellness data
   created_at: string;
   updated_at: string;
 }
