@@ -400,8 +400,14 @@ export class CommandHandler {
       };
       conversationHistory.push(userMessage);
 
+      // ⏰ Показываем, что бот "печатает"
+      await ctx.sendChatAction('typing');
+
       // Generate AI response
       const response = await conversationService.generateResponse(conversationHistory);
+
+      // ⚡ БЫСТРЫЙ ОТВЕТ - сразу отвечаем пользователю!
+      await ctx.reply(response);
 
       // Add AI response to history
       const aiMessage = {
@@ -435,8 +441,11 @@ export class CommandHandler {
             wellnessData: wellnessData
           });
           
-          // Generate comprehensive wellness summary for each update (real-time summary)
-          const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+          // ⚡ ОПТИМИЗАЦИЯ: генерируем summary только для длинных разговоров
+          let wellnessSummary = 'Ongoing conversation - summary will be generated after more exchanges';
+          if (conversationHistory.length >= 10) { // Генерируем summary только после 10+ сообщений
+            wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+          }
           
           // Create transcription from conversation history
           const transcription = conversationHistory
@@ -554,8 +563,6 @@ export class CommandHandler {
           });
         }
       }
-
-      await ctx.reply(response);
 
       logUserAction(ctx, 'natural_conversation', {
         messageLength: text.length,
