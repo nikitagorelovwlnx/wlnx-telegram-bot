@@ -284,7 +284,7 @@ export class InterviewHandler {
       const token = userService.getApiToken(userInfo.id.toString());
 
       if (!token) {
-        await ctx.reply('❌ Вы не авторизованы. Используйте /login для входа.');
+        await ctx.reply('❌ You are not authenticated. Use /login to access.');
         return;
       }
 

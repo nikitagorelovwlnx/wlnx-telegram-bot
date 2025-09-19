@@ -102,7 +102,7 @@ export class TelegramBot {
         // Save interview
         const { apiService } = await import('./services/apiService');
         
-        await ctx.reply('⏳ Сохраняю интервью...');
+        await ctx.reply('⏳ Saving interview...');
         
         const interview = {
           position: interviewData.position!,

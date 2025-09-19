@@ -234,7 +234,7 @@ class ApiService {
         statusText: response.statusText,
         dataKeys: Object.keys(response.data)
       });
-      return response.data;
+      return (response.data as any).result || response.data;
     } catch (error: any) {
       console.error('❌ API Request Failed:', {
         message: error.message,
@@ -255,7 +255,7 @@ class ApiService {
     const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/interviews', {
       params: { email }
     });
-    return response.data;
+    return (response.data as any).result || response.data;
   }
 
   async updateWellnessInterview(
@@ -267,14 +267,14 @@ class ApiService {
       email,
       ...interviewData
     });
-    return response.data;
+    return (response.data as any).result || response.data;
   }
 
   async getWellnessInterview(email: string, id: string): Promise<WellnessInterview> {
     const response: AxiosResponse<WellnessInterview> = await this.api.get(`/interviews/${id}`, {
       params: { email }
     });
-    return response.data;
+    return (response.data as any).result || response.data;
   }
 
   async deleteWellnessInterview(email: string, id: string): Promise<void> {
