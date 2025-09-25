@@ -73,6 +73,9 @@ export interface BotUser {
   conversationActive?: boolean;
   currentInterviewId?: string;  // Track current interview session ID for updates
   registrationStep?: 'name' | 'email' | 'password';
+  
+  // NEW: Staged wellness data collection
+  wellnessProgress?: WellnessStageProgress;
   extractedUserInfo?: {
     // Demographics and Baseline
     age?: number;
@@ -209,4 +212,53 @@ export interface BotConfig {
   logLevel: string;
   openaiApiKey?: string;
   openaiModel: string;
+}
+
+// Wellness Form Collection Stages
+export type WellnessStage = 
+  | 'demographics_baseline'
+  | 'biometrics_habits'
+  | 'lifestyle_context' 
+  | 'medical_history'
+  | 'goals_preferences'
+  | 'completed';
+
+export interface WellnessStageProgress {
+  currentStage: WellnessStage;
+  completedStages: WellnessStage[];
+  stageData: {
+    [key in WellnessStage]?: Partial<WellnessData>;
+  };
+  messageHistory: {
+    [key in WellnessStage]?: ConversationMessage[];
+  };
+  usedGPTForExtraction: boolean; // Track if GPT was used vs pattern matching
+  startedAt: string;
+  lastActiveAt: string;
+}
+
+// Stage-specific data extraction results
+export interface StageExtractionResult {
+  stage: WellnessStage;
+  extractedData: Partial<WellnessData>;
+  extractionMethod: 'pattern_matching' | 'gpt_extraction';
+  confidence: number; // 0-100
+  missingFields: string[];
+  extractionLog?: string;
+}
+
+// GPT Extraction request/response
+export interface GPTExtractionRequest {
+  stage: WellnessStage;
+  userResponse: string;
+  conversationContext: ConversationMessage[];
+  previousData?: Partial<WellnessData>;
+}
+
+export interface GPTExtractionResponse {
+  extractedData: Partial<WellnessData>;
+  confidence: number;
+  reasoning: string;
+  suggestedNextQuestion?: string;
+  stageComplete: boolean;
 }

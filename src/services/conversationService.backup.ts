@@ -311,7 +311,7 @@ class ConversationService {
     }
 
     // Enhanced sleep duration extraction
-    const sleepPatterns = [
+    const sleepPatternsEnhanced = [
       /(?:i\s*)?(?:sleep|get|have)\s*(?:about|around|roughly|approximately)?\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:of\s*sleep|per\s*night|each\s*night|a\s*night)?/i,
       /(?:sleep|rest)\s*(?:for|about|around)?\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)/i,
       /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:of\s*)?(?:sleep|rest)/i,
@@ -323,7 +323,7 @@ class ConversationService {
       /(?:need|require)\s*(?:about|around)?\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:of\s*sleep|to\s*sleep)/i
     ];
     
-    for (const pattern of sleepPatterns) {
+    for (const pattern of sleepPatternsEnhanced) {
       const match = allText.match(pattern);
       if (match) {
         let sleepHours = 0;
@@ -374,12 +374,12 @@ class ConversationService {
     }
 
     // Extract biometrics and habits
-    const sleepPatterns = [
+    const sleepPatternsSimple = [
       /sleep\s*(?:about|around)?\s*(\d+)\s*hours?/i,
       /(\d+)\s*hours?\s*(?:of\s*)?sleep/i,
       /get\s*(?:about|around)?\s*(\d+)\s*hours?/i
     ];
-    for (const pattern of sleepPatterns) {
+    for (const pattern of sleepPatternsSimple) {
       const match = allText.match(pattern);
       if (match) {
         userInfo.sleep_duration = parseInt(match[1]);

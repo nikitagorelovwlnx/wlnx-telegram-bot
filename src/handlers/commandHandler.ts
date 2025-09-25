@@ -77,7 +77,12 @@ export class CommandHandler {
 
       await ctx.reply(
         `Hey ${user.firstName || 'friend'}! 😊\n\n` +
-        'Just text me whatever you want to discuss - health, nutrition, fitness, how you\'re feeling. I\'m always ready to chat and give advice!'
+        'Just text me whatever you want to discuss - health, nutrition, fitness, how you\'re feeling. I\'m always ready to chat and give advice!\n\n' +
+        'When we first chat, I\'ll naturally learn about you to give better recommendations. No forms or commands needed - just talk to me! 😊\n\n' +
+        '**Available commands:**\n' +
+        '💾 /save_interview - Save our conversation to server\n' +
+        '🔄 /new_interview - Start a new conversation\n' +
+        '⚙️ /settings - Profile settings'
       );
 
     } catch (error) {
@@ -226,8 +231,20 @@ export class CommandHandler {
         return;
       }
 
+      // NEW: Handle wellness stage-based data collection
+      if (user?.wellnessProgress && user.wellnessProgress.currentStage !== 'completed') {
+        await CommandHandler.handleWellnessStageInput(ctx, text);
+        return;
+      }
+
       // Main conversation flow - natural chat with AI
       if (user?.isAuthenticated) {
+        // Check if user needs to fill wellness form (no extracted data yet)
+        if (!user.extractedUserInfo || Object.keys(user.extractedUserInfo).length === 0) {
+          await CommandHandler.handleWellnessDataCollection(ctx, text);
+          return;
+        }
+        
         await CommandHandler.handleNaturalConversation(ctx, text);
         return;
       }
@@ -626,6 +643,137 @@ export class CommandHandler {
 
     } catch (error) {
       handleError(ctx, error, 'Something went wrong with registration 😅');
+    }
+  }
+
+  // NEW: Wellness data collection through natural conversation
+
+  /**
+   * Handles wellness data collection through natural conversation
+   */
+  static async handleWellnessDataCollection(ctx: Context, text: string): Promise<void> {
+    try {
+      const userInfo = getUserInfo(ctx);
+      const user = userService.getUser(userInfo.id.toString());
+
+      if (!user?.isAuthenticated) {
+        await ctx.reply('Hey! 😊 To chat, I need to get to know you first. Type /start to begin!');
+        return;
+      }
+
+      const { wellnessStageService } = await import('../services/wellnessStageService');
+      
+      if (!wellnessStageService.isAvailable()) {
+        // Fallback to old conversation method if no OpenAI
+        await CommandHandler.handleNaturalConversation(ctx, text);
+        return;
+      }
+
+      // Initialize wellness process if not started
+      if (!user.wellnessProgress) {
+        const wellnessProgress = wellnessStageService.initializeWellnessProcess();
+        userService.setUser(userInfo.id.toString(), { 
+          wellnessProgress,
+          conversationActive: false 
+        });
+
+        const introMessage = wellnessStageService.getStageIntroduction(wellnessProgress.currentStage);
+        await ctx.reply(
+          `Hi! I'm Anna, your wellness consultant 😊\n\n` +
+          `To give you the best advice, I'd like to learn about you. This will only take a few minutes.\n\n` +
+          introMessage
+        );
+        return;
+      }
+
+      // Process user response through wellness stages
+      await CommandHandler.handleWellnessStageInput(ctx, text);
+
+    } catch (error) {
+      handleError(ctx, error, 'Something went wrong during data collection');
+    }
+  }
+
+
+  /**
+   * Обрабатывает ввод пользователя в рамках wellness формы по этапам
+   */
+  static async handleWellnessStageInput(ctx: Context, text: string): Promise<void> {
+    try {
+      const userInfo = getUserInfo(ctx);
+      const user = userService.getUser(userInfo.id.toString());
+
+      if (!user?.wellnessProgress) {
+        await ctx.reply('❌ Ошибка состояния формы. Используйте /wellness_form чтобы начать.');
+        return;
+      }
+
+      const { wellnessStageService } = await import('../services/wellnessStageService');
+
+      // Показываем что бот обрабатывает ответ
+      await ctx.sendChatAction('typing');
+
+      // Обрабатываем ответ пользователя через ChatGPT
+      let result;
+      try {
+        result = await wellnessStageService.processUserResponse(text, user.wellnessProgress);
+      } catch (error) {
+        logger.error('Wellness stage processing error:', error);
+        
+        if (error instanceof Error && error.message.includes('OpenAI API key')) {
+          await ctx.reply(
+            '❌ Система поэтапного заполнения недоступна (нет доступа к ChatGPT).\n\n' +
+            'Используйте обычное общение - просто расскажите о себе.'
+          );
+          
+          // Переключаемся обратно на обычный разговор
+          userService.setUser(userInfo.id.toString(), { 
+            wellnessProgress: undefined,
+            conversationActive: true 
+          });
+          return;
+        }
+        
+        await ctx.reply(
+          '❌ Произошла ошибка при обработке ответа. Попробуйте еще раз или используйте /wellness_restart для перезапуска формы.'
+        );
+        return;
+      }
+      
+      // Обновляем данные пользователя
+      userService.setUser(userInfo.id.toString(), { 
+        wellnessProgress: result.updatedProgress 
+      });
+
+      // Отправляем ответ бота
+      await ctx.reply(result.botResponse);
+
+      // Если форма завершена, возвращаемся к обычному разговору
+      if (result.updatedProgress.currentStage === 'completed') {
+        const finalData = wellnessStageService.getFinalWellnessData(result.updatedProgress);
+        
+        // Сохраняем финальные данные
+        userService.setUser(userInfo.id.toString(), { 
+          extractedUserInfo: finalData,
+          conversationActive: true // Возвращаем обычный разговор
+        });
+
+        setTimeout(async () => {
+          await ctx.reply(
+            '🎉 Отлично! Теперь у меня есть вся необходимая информация для персональных рекомендаций.\n\n' +
+            'Можете продолжить обычное общение или использовать /save_interview для сохранения данных на сервер.'
+          );
+        }, 1000);
+      }
+
+      logUserAction(ctx, 'wellness_stage_input', { 
+        stage: user.wellnessProgress.currentStage,
+        extractionMethod: result.extractionResult.extractionMethod,
+        confidence: result.extractionResult.confidence
+      });
+
+    } catch (error) {
+      handleError(ctx, error, 'Ошибка при обработке ответа формы');
     }
   }
 }

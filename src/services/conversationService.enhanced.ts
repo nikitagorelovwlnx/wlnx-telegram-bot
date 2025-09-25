@@ -580,7 +580,7 @@ class EnhancedConversationService {
         .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
         .join('\n\n');
 
-      const prompt = generateWellnessSummaryPrompt(extractedUserInfo, transcription);
+      const prompt = generateWellnessSummaryPrompt(transcription, extractedUserInfo);
       
       // Try GPT-5 first, fallback to GPT-4 if it fails
       let response;
