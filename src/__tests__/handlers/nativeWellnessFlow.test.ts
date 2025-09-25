@@ -74,9 +74,14 @@ describe('Native Wellness Flow (No Commands)', () => {
     });
 
     it('should fallback to normal conversation if OpenAI not available during registration', async () => {
-      // Mock service as unavailable
-      const { wellnessStageService } = require('../../services/wellnessStageService');
-      wellnessStageService.isAvailable = jest.fn().mockReturnValue(false);
+      // Mock wellnessStageService as unavailable
+      jest.doMock('../../services/wellnessStageService', () => ({
+        wellnessStageService: {
+          initializeWellnessProcess: jest.fn(),
+          generateQuestion: jest.fn(),
+          isAvailable: jest.fn().mockReturnValue(false)
+        }
+      }));
 
       (userService.getUser as jest.Mock).mockReturnValue({
         id: '123',

@@ -124,13 +124,14 @@ describe('CommandHandler', () => {
           registrationStep: 'email'
         })
       );
+      expect(mockCtx.reply).toHaveBeenCalledWith(
         expect.stringContaining('Nice to meet you, John Doe!')
       );
     });
 
     it('should handle email registration step', async () => {
       (userService.getUser as jest.Mock).mockReturnValue({
-        id: '123',
+        id: '123456789',
         isAuthenticated: false,
         registrationStep: 'email',
         firstName: 'John'
@@ -151,7 +152,7 @@ describe('CommandHandler', () => {
         isAvailable: jest.fn().mockReturnValue(true)
       };
 
-      jest.doMock('../../../services/wellnessStageService', () => ({
+      jest.doMock('../../services/wellnessStageService', () => ({
         wellnessStageService: mockWellnessStageService
       }));
 
@@ -163,11 +164,12 @@ describe('CommandHandler', () => {
       );
 
       expect(userService.setUser).toHaveBeenCalledWith(
-        '123',
+        '123456789',
         expect.objectContaining({
           email: 'john@example.com',
           isAuthenticated: true,
-          registrationStep: undefined
+          registrationStep: undefined,
+          wellnessProgress: expect.any(Object)
         })
       );
       
@@ -190,8 +192,8 @@ describe('CommandHandler', () => {
       expect(mockCtx.reply).toHaveBeenCalledWith(
         expect.stringContaining('doesn\'t look like an email')
       );
-      // Should not update user when email is invalid - но в коде он все равно обновляется при fallback
-      expect(userService.setUser).toHaveBeenCalled();
+      // Email validation failed, setUser should not be called for completion
+      expect(userService.setUser).not.toHaveBeenCalled();
     });
 
     it('should handle no registration step', async () => {

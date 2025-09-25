@@ -11,7 +11,8 @@ jest.mock('../../services/promptConfigService', () => ({
   promptConfigService: {
     getExtractionPrompt: jest.fn().mockResolvedValue('Extract demographic data from user response in JSON format.'),
     getQuestionPrompt: jest.fn().mockResolvedValue('Ask about user demographics like age, gender, weight, height.'),
-    getStageIntroduction: jest.fn().mockResolvedValue('Tell me about yourself - age, gender, and basic info.')
+    getStageIntroduction: jest.fn().mockResolvedValue('Tell me about yourself - age, gender, and basic info.'),
+    getRequiredFields: jest.fn().mockResolvedValue(['age', 'gender'])
   }
 }));
 
@@ -41,7 +42,8 @@ jest.mock('openai', () => {
 // Mock config для OpenAI ключа и логгера
 jest.mock('../../config', () => ({
   config: {
-    logLevel: 'info'
+    logLevel: 'info',
+    openaiApiKey: 'test-key-123'
   }
 }));
 
@@ -49,6 +51,7 @@ describe('WellnessStageService', () => {
   beforeEach(() => {
     // Мокаем конфиг для тестов
     (config as any).openaiApiKey = 'test-key';
+    jest.clearAllMocks();
   });
 
   describe('initializeWellnessProcess', () => {
@@ -59,7 +62,7 @@ describe('WellnessStageService', () => {
       expect(progress.completedStages).toEqual([]);
       expect(progress.stageData).toEqual({});
       expect(progress.messageHistory).toEqual({});
-{{ ... }}
+      expect(progress.usedGPTForExtraction).toBe(false);
       expect(progress.startedAt).toBeDefined();
       expect(progress.lastActiveAt).toBeDefined();
     });

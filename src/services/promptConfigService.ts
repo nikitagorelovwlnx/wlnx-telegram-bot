@@ -138,7 +138,8 @@ class PromptConfigService {
         ];
         
         for (const stage of requiredStages) {
-          if (!data.data[stage] || !data.data[stage].question_prompt || !data.data[stage].extraction_prompt) {
+          const stageData = (data.data as any)[stage];
+          if (!stageData || !stageData.question_prompt || !stageData.extraction_prompt) {
             throw new Error(`Missing or invalid prompts for stage: ${stage}`);
           }
         }
@@ -146,31 +147,11 @@ class PromptConfigService {
         return data;
       }, 'Load prompts from server');
       
-      if (!data.success || !data.data || !data.data.stages) {
-        throw new Error('Invalid response format from server');
-      }
-
-      // Validate stages
-      const expectedStages: WellnessStage[] = [
-        'demographics_baseline',
-        'biometrics_habits', 
-        'lifestyle_context',
-        'medical_history',
-        'goals_preferences'
-      ];
-
-      const receivedStages = data.data.stages.map(s => s.stage);
-      const missingStages = expectedStages.filter(stage => !receivedStages.includes(stage));
-      
-      if (missingStages.length > 0) {
-        throw new Error(`Missing stages in server response: ${missingStages.join(', ')}`);
-      }
-
       // Cache the result
       this.cache.set('wellness_prompts', data);
       this.lastFetchTime = now;
 
-      logger.info(`Loaded ${data.data.stages.length} stage prompts from server (version: ${data.version || 'unknown'})`);
+      logger.info(`Loaded wellness prompts from server with ${Object.keys(data.data).length} stages`);
       return data;
 
     } catch (error) {
@@ -341,16 +322,11 @@ class PromptConfigService {
   }
 
   /**
-   * Get system prompt for wellness extraction
+   * Get system prompt for wellness extraction (not available in new API format)
    */
   async getSystemPrompt(): Promise<string> {
-    const config = await this.loadPromptConfig();
-    if (config?.data.systemPrompt) {
-      return config.data.systemPrompt;
-    }
-
-    // Fallback to hardcoded system prompt
-    logger.warn('Using fallback system prompt');
+    // New API format doesn't have systemPrompt, use fallback
+    logger.warn('Using fallback system prompt - not available in new API format');
     return this.getFallbackSystemPrompt();
   }
 
@@ -387,35 +363,20 @@ class PromptConfigService {
   }
 
   /**
-   * Get stage introduction message
+   * Get stage introduction message (not available in new API format)
    */
   async getStageIntroduction(stage: WellnessStage): Promise<string> {
-    const config = await this.loadPromptConfig();
-    if (config?.data.stages) {
-      const stageConfig = config.data.stages.find(s => s.stage === stage);
-      if (stageConfig?.introductionMessage) {
-        return stageConfig.introductionMessage;
-      }
-    }
-
-    // Fallback to hardcoded messages
-    logger.warn(`Using fallback introduction for stage: ${stage}`);
+    // New API format doesn't have introductionMessage, use fallback
+    logger.warn(`Using fallback introduction for stage: ${stage} - not available in new API format`);
     return this.getFallbackIntroduction(stage);
   }
 
   /**
-   * Get required fields for stage completion
+   * Get required fields for stage completion (not available in new API format)
    */
   async getRequiredFields(stage: WellnessStage): Promise<string[]> {
-    const config = await this.loadPromptConfig();
-    if (config?.data.stages) {
-      const stageConfig = config.data.stages.find(s => s.stage === stage);
-      if (stageConfig?.requiredFields) {
-        return stageConfig.requiredFields;
-      }
-    }
-
-    // Fallback to hardcoded requirements
+    // New API format doesn't have requiredFields, use fallback
+    logger.warn(`Using fallback required fields for stage: ${stage} - not available in new API format`);
     return this.getFallbackRequiredFields(stage);
   }
 

@@ -71,16 +71,21 @@ describe('ConversationService', () => {
         call[0].model === 'gpt-5' || call[0].model === 'gpt-4'
       );
       expect(validCall).toBeDefined();
-      expect(validCall[0].messages).toEqual(expect.arrayContaining([
+      // ConversationService now just passes messages directly without system prompts
+      expect(validCall[0].messages).toEqual([
         expect.objectContaining({
-          role: 'system',
-          content: expect.stringContaining('wellness consultant')
+          role: 'user',
+          content: 'Hi, I\'m 28 years old, weigh 65kg and I\'m 170cm tall'
         }),
         expect.objectContaining({
-          role: 'assistant', 
-          content: expect.stringContaining('You are Anna')
+          role: 'assistant',
+          content: 'Hi! Nice to meet you! How has your health been lately?'
+        }),
+        expect.objectContaining({
+          role: 'user',
+          content: 'I sleep about 7 hours per night and walk 8000 steps daily. I feel stressed lately.'
         })
-      ]));
+      ]);
       expect(validCall[0].temperature).toBe(0.7);
       
       if (validCall[0].model === 'gpt-5') {
@@ -113,12 +118,13 @@ describe('ConversationService', () => {
         call[0].model === 'gpt-5' || call[0].model === 'gpt-4'
       );
       expect(validCall).toBeDefined();
-      expect(validCall[0].messages).toEqual(expect.arrayContaining([
+      // ConversationService now just passes messages directly without system prompts
+      expect(validCall[0].messages).toEqual([
         expect.objectContaining({
-          role: 'system',
-          content: expect.stringContaining('beginning of your conversation')
+          role: 'user',
+          content: 'Hi, I\'m 28 years old, weigh 65kg and I\'m 170cm tall'
         })
-      ]));
+      ]);
       expect(validCall[0].temperature).toBe(0.7);
       
       if (validCall[0].model === 'gpt-5') {
