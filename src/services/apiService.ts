@@ -171,29 +171,6 @@ class ApiService {
     return response.data;
   }
 
-  async getInterviewResult(token: string, id: number): Promise<InterviewResult> {
-    const response: AxiosResponse<InterviewResult> = await this.api.get(`/interviews/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data;
-  }
-
-  async updateInterviewResult(
-    token: string,
-    id: number,
-    interviewData: Partial<InterviewResult>
-  ): Promise<InterviewResult> {
-    const response: AxiosResponse<InterviewResult> = await this.api.put(`/interviews/${id}`, interviewData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data;
-  }
-
-  async deleteInterviewResult(token: string, id: number): Promise<void> {
-    await this.api.delete(`/interviews/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
 
   // Wellness Interview endpoints (email-based, no auth required)
   async createWellnessInterview(
