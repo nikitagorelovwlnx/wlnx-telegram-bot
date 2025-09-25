@@ -55,50 +55,85 @@ describe('Native Wellness Flow (No Commands)', () => {
     });
   });
 
-  describe('handleWellnessDataCollection', () => {
-    it('should automatically start wellness collection for new authenticated users', async () => {
-      await CommandHandler.handleWellnessDataCollection(mockCtx, 'Hi there!');
+  describe('Registration Flow with Wellness Start', () => {
+    it('should start wellness collection after registration completion', async () => {
+      // Mock registration completion flow
+      (userService.getUser as jest.Mock).mockReturnValue({
+        id: '123',
+        isAuthenticated: false,
+        registrationStep: 'email',
+        firstName: 'John'
+      });
 
-      // Should call reply at least once - the exact message depends on server response
+      (mockCtx as any).message = { text: 'john@example.com' };
+      await CommandHandler.handleRegistrationFlow(mockCtx, 'john@example.com');
+
+      // Should call reply and set user data
       expect(mockCtx.reply).toHaveBeenCalled();
-      
-      // Check that user service was called to update progress
       expect(userService.setUser).toHaveBeenCalled();
     });
 
-    it('should fallback to normal conversation if OpenAI not available', async () => {
+    it('should fallback to normal conversation if OpenAI not available during registration', async () => {
       // Mock service as unavailable
       const { wellnessStageService } = require('../../services/wellnessStageService');
       wellnessStageService.isAvailable = jest.fn().mockReturnValue(false);
 
-      const handleNaturalConversationSpy = jest.spyOn(CommandHandler, 'handleNaturalConversation')
-        .mockImplementation(() => Promise.resolve());
+      (userService.getUser as jest.Mock).mockReturnValue({
+        id: '123',
+        isAuthenticated: false,
+        registrationStep: 'email',
+        firstName: 'John'
+      });
 
-      await CommandHandler.handleWellnessDataCollection(mockCtx, 'Hello');
+      (mockCtx as any).message = { text: 'john@example.com' };
+      await CommandHandler.handleRegistrationFlow(mockCtx, 'john@example.com');
 
-      expect(handleNaturalConversationSpy).toHaveBeenCalled();
+      expect(mockCtx.reply).toHaveBeenCalled();
     });
   });
 
   describe('User Flow Integration', () => {
-    it('should automatically trigger wellness collection for users without data', async () => {
-      const handleWellnessDataCollectionSpy = jest.spyOn(CommandHandler, 'handleWellnessDataCollection')
+    it('should continue wellness collection for users with active progress', async () => {
+      // User has active wellness progress
+      (userService.getUser as jest.Mock).mockReturnValue({
+        id: '123',
+        isAuthenticated: true,
+        firstName: 'John',
+        wellnessProgress: {
+          currentStage: 'demographics_baseline',
+          completedStages: [],
+          stageData: {},
+          messageHistory: {},
+          usedGPTForExtraction: false,
+          startedAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString()
+        }
+      });
+
+      const handleWellnessStageInputSpy = jest.spyOn(CommandHandler, 'handleWellnessStageInput')
         .mockImplementation(() => Promise.resolve());
 
       (mockCtx as any).message = { text: 'Hello there!' };
       await CommandHandler.handleText(mockCtx);
 
-      expect(handleWellnessDataCollectionSpy).toHaveBeenCalledWith(mockCtx, 'Hello there!');
+      expect(handleWellnessStageInputSpy).toHaveBeenCalledWith(mockCtx, 'Hello there!');
     });
 
-    it('should use normal conversation for users with existing data', async () => {
-      // User already has extracted data
+    it('should use normal conversation for users with completed wellness', async () => {
+      // User completed wellness collection
       (userService.getUser as jest.Mock).mockReturnValue({
         id: '123',
         isAuthenticated: true,
         firstName: 'John',
-        extractedUserInfo: { age: 25, gender: 'male' }, // Has data
-        wellnessProgress: null
+        wellnessProgress: {
+          currentStage: 'completed',
+          completedStages: ['demographics_baseline', 'biometrics_habits', 'lifestyle_context', 'medical_history', 'goals_preferences'],
+          stageData: { age: 25, gender: 'male' },
+          messageHistory: {},
+          usedGPTForExtraction: true,
+          startedAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString()
+        }
       });
 
       const handleNaturalConversationSpy = jest.spyOn(CommandHandler, 'handleNaturalConversation')

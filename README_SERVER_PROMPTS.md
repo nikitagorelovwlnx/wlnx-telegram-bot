@@ -30,7 +30,9 @@ The bot now loads all prompt configurations from the server instead of using har
 
 ## Server API Contract
 
-### Expected Endpoint: `GET /api/prompts/wellness-stages`
+### Expected Endpoints:
+
+#### 1. `GET /api/prompts` - Wellness Interview Prompts
 
 ```typescript
 interface PromptsResponse {
@@ -53,7 +55,23 @@ interface StagePromptConfig {
 }
 ```
 
-### Example Response:
+#### 2. `GET /api/form-schemas` - Wellness Form Schema
+
+```typescript
+interface FormSchemaResponse {
+  success: boolean;
+  data: {
+    schema: any; // Wellness form schema structure
+    version?: string;
+    description?: string;
+  };
+  lastUpdated?: string;
+}
+```
+
+### Example Responses:
+
+#### Prompts Response:
 ```json
 {
   "success": true,
@@ -72,6 +90,34 @@ interface StagePromptConfig {
     ]
   },
   "version": "1.0.0",
+  "lastUpdated": "2024-01-15T10:30:00Z"
+}
+```
+
+#### Form Schema Response:
+```json
+{
+  "success": true,
+  "data": {
+    "schema": {
+      "stages": [
+        "demographics_baseline",
+        "biometrics_habits", 
+        "lifestyle_context",
+        "medical_history",
+        "goals_preferences"
+      ],
+      "fields": {
+        "demographics_baseline": ["age", "gender", "weight", "height", "location"],
+        "biometrics_habits": ["sleep_duration", "daily_steps", "stress_level"],
+        "lifestyle_context": ["work_schedule", "workload"],
+        "medical_history": ["chronic_conditions", "medications"],
+        "goals_preferences": ["health_goals", "activity_preferences"]
+      }
+    },
+    "version": "1.0.0",
+    "description": "Wellness form data collection schema"
+  },
   "lastUpdated": "2024-01-15T10:30:00Z"
 }
 ```

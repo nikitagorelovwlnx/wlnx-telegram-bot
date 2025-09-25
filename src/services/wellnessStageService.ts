@@ -16,7 +16,16 @@ import {
   ConversationMessage
 } from '../types';
 import { promptConfigService } from './promptConfigService';
-import { STAGE_PROGRESSION } from '../prompts/wellnessStagePrompts';
+
+// Stage progression from server schema (fallback if not provided)
+const STAGE_PROGRESSION: Record<WellnessStage, WellnessStage> = {
+  'demographics_baseline': 'biometrics_habits',
+  'biometrics_habits': 'lifestyle_context',
+  'lifestyle_context': 'medical_history',
+  'medical_history': 'goals_preferences',
+  'goals_preferences': 'completed',
+  'completed': 'completed'
+};
 
 class WellnessStageService {
   private openai: OpenAI | null = null;
@@ -126,12 +135,17 @@ class WellnessStageService {
         botResponse = 'Great! I have all the information I need. Now I can give you personalized wellness recommendations! 🎉';
       } else {
         progress.currentStage = nextStage;
-        const nextIntro = await this.getStageIntroduction(nextStage);
-        botResponse = `Perfect! ⚅ Moving to the next section.\n\n${nextIntro}`;
+        
+        // Генерируем динамический вопрос для следующего этапа с учетом всего контекста
+        const conversationContext = this.buildConversationContext(progress);
+        const nextQuestion = await this.generateQuestion(nextStage, conversationContext);
+        
+        botResponse = `Perfect! ⚅ Moving to the next section.\n\n${nextQuestion}`;
       }
     } else {
-      // Этап не завершен - задаем дополнительные вопросы
-      botResponse = await this.generateFollowUpQuestion(stage, progress.stageData[stage] || {}, extractionResult);
+      // Этап не завершен - генерируем дополнительный вопрос с контекстом
+      const conversationContext = this.buildConversationContext(progress);
+      botResponse = await this.generateQuestion(stage, conversationContext);
     }
 
     return {
@@ -143,6 +157,67 @@ class WellnessStageService {
   }
 
   /**
+   * Строит контекст всей беседы из прогресса wellness формы
+   */
+  private buildConversationContext(progress: WellnessStageProgress): ConversationMessage[] {
+    const context: ConversationMessage[] = [];
+    
+    // Собираем сообщения из всех этапов в хронологическом порядке
+    for (const stage of progress.completedStages) {
+      const stageMessages = progress.messageHistory[stage] || [];
+      context.push(...stageMessages);
+    }
+    
+    // Добавляем сообщения из текущего этапа
+    const currentStageMessages = progress.messageHistory[progress.currentStage] || [];
+    context.push(...currentStageMessages);
+    
+    return context;
+  }
+
+  /**
+   * Генерация натурального вопроса для этапа с учетом контекста
+   */
+  async generateQuestion(stage: WellnessStage, conversationContext: ConversationMessage[]): Promise<string> {
+    if (!this.openai) {
+      throw new Error('OpenAI service not available');
+    }
+
+    // Получаем question промпт с сервера для генерации вопроса
+    const questionPrompt = await promptConfigService.getQuestionPrompt(stage);
+    
+    const messages = [
+      { 
+        role: 'system', 
+        content: questionPrompt
+      },
+      // Добавляем весь предыдущий контекст беседы
+      ...conversationContext.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: 'Generate next natural question for this wellness stage based on our conversation context.'
+      }
+    ];
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: messages as any,
+        max_tokens: 300,
+        temperature: 0.7
+      });
+
+      return response.choices[0]?.message?.content || 'Tell me more about yourself.';
+    } catch (error) {
+      logger.error('Error generating question:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Извлечение данных с помощью ChatGPT (использует удаленные промпты)
    */
   private async extractDataWithGPT(request: GPTExtractionRequest): Promise<GPTExtractionResponse> {
@@ -150,14 +225,13 @@ class WellnessStageService {
       throw new Error('OpenAI service not available');
     }
 
-    // Получаем промпты с сервера
-    const systemPrompt = await promptConfigService.getSystemPrompt();
-    const stagePrompt = await promptConfigService.getStagePrompt(request.stage);
+    // Получаем extraction промпт с сервера для извлечения данных
+    const extractionPrompt = await promptConfigService.getExtractionPrompt(request.stage);
     
     const messages = [
       { 
         role: 'system', 
-        content: systemPrompt + '\n\n' + stagePrompt
+        content: extractionPrompt
       },
       {
         role: 'user',

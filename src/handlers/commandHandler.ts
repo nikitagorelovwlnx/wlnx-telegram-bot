@@ -231,20 +231,15 @@ export class CommandHandler {
         return;
       }
 
-      // NEW: Handle wellness stage-based data collection
-      if (user?.wellnessProgress && user.wellnessProgress.currentStage !== 'completed') {
-        await CommandHandler.handleWellnessStageInput(ctx, text);
-        return;
-      }
-
-      // Main conversation flow - natural chat with AI
+      // Main conversation flow - wellness data collection or natural chat
       if (user?.isAuthenticated) {
-        // Check if user needs to fill wellness form (no extracted data yet)
-        if (!user.extractedUserInfo || Object.keys(user.extractedUserInfo).length === 0) {
-          await CommandHandler.handleWellnessDataCollection(ctx, text);
+        // If user has active wellness progress - continue wellness collection
+        if (user.wellnessProgress && user.wellnessProgress.currentStage !== 'completed') {
+          await CommandHandler.handleWellnessStageInput(ctx, text);
           return;
         }
         
+        // If user completed wellness - normal conversation
         await CommandHandler.handleNaturalConversation(ctx, text);
         return;
       }
@@ -621,23 +616,49 @@ export class CommandHandler {
             return;
           }
           
-          // Complete registration - just save name and email, no password needed
+          // Complete registration and start wellness data collection
+          const { wellnessStageService } = await import('../services/wellnessStageService');
+          
+          // Check if wellness service is available
+          if (!wellnessStageService.isAvailable()) {
+            // Fallback - complete registration without wellness collection
+            userService.setUser(userInfo.id.toString(), {
+              email: text,
+              isAuthenticated: true,
+              registrationStep: undefined,
+              conversationActive: true,
+              conversationHistory: []
+            });
+
+            await ctx.reply(
+              `Perfect! Now we know each other 🎉\n\n` +
+              'Tell me, how are you doing? What\'s bothering you or what interests you?'
+            );
+            return;
+          }
+
+          // Initialize wellness data collection process
+          const wellnessProgress = wellnessStageService.initializeWellnessProcess();
+          
           userService.setUser(userInfo.id.toString(), {
             email: text,
             isAuthenticated: true,
-            registrationStep: undefined
+            registrationStep: undefined,
+            wellnessProgress,
+            conversationActive: false // Disable normal conversation during wellness collection
           });
 
+          // Generate first wellness question using ChatGPT
+          const firstQuestion = await wellnessStageService.generateQuestion(
+            wellnessProgress.currentStage, 
+            [] // No previous context for first question
+          );
+          
           await ctx.reply(
             `Perfect! Now we know each other 🎉\n\n` +
-            'Tell me, how are you doing? What\'s bothering you or what interests you?'
+            `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
+            `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
           );
-
-          // Start natural conversation
-          userService.setUser(userInfo.id.toString(), {
-            conversationActive: true,
-            conversationHistory: []
-          });
           break;
       }
 
@@ -646,53 +667,6 @@ export class CommandHandler {
     }
   }
 
-  // NEW: Wellness data collection through natural conversation
-
-  /**
-   * Handles wellness data collection through natural conversation
-   */
-  static async handleWellnessDataCollection(ctx: Context, text: string): Promise<void> {
-    try {
-      const userInfo = getUserInfo(ctx);
-      const user = userService.getUser(userInfo.id.toString());
-
-      if (!user?.isAuthenticated) {
-        await ctx.reply('Hey! 😊 To chat, I need to get to know you first. Type /start to begin!');
-        return;
-      }
-
-      const { wellnessStageService } = await import('../services/wellnessStageService');
-      
-      if (!wellnessStageService.isAvailable()) {
-        // Fallback to old conversation method if no OpenAI
-        await CommandHandler.handleNaturalConversation(ctx, text);
-        return;
-      }
-
-      // Initialize wellness process if not started
-      if (!user.wellnessProgress) {
-        const wellnessProgress = wellnessStageService.initializeWellnessProcess();
-        userService.setUser(userInfo.id.toString(), { 
-          wellnessProgress,
-          conversationActive: false 
-        });
-
-        const introMessage = wellnessStageService.getStageIntroduction(wellnessProgress.currentStage);
-        await ctx.reply(
-          `Hi! I'm Anna, your wellness consultant 😊\n\n` +
-          `To give you the best advice, I'd like to learn about you. This will only take a few minutes.\n\n` +
-          introMessage
-        );
-        return;
-      }
-
-      // Process user response through wellness stages
-      await CommandHandler.handleWellnessStageInput(ctx, text);
-
-    } catch (error) {
-      handleError(ctx, error, 'Something went wrong during data collection');
-    }
-  }
 
 
   /**

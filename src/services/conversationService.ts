@@ -2,15 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../config';
 import { ConversationMessage, WellnessData } from '../types';
 import { logger } from '../utils/logger';
-import { 
-  CONVERSATION_PERSONA_PROMPT, 
-  FIRST_MESSAGE_CONTEXT,
-  CONVERSATION_SYSTEM_PROMPT 
-} from '../prompts/conversationPrompts';
-import { 
-  WELLNESS_SUMMARY_SYSTEM_PROMPT,
-  generateWellnessSummaryPrompt 
-} from '../prompts/summaryPrompts';
+import { promptConfigService } from './promptConfigService';
 
 class EnhancedConversationService {
   private openai: OpenAI | null = null;
@@ -31,15 +23,7 @@ class EnhancedConversationService {
     }
 
     try {
-      const messages = [
-        { role: 'system', content: CONVERSATION_SYSTEM_PROMPT },
-        { role: 'assistant', content: CONVERSATION_PERSONA_PROMPT }
-      ];
-
-      // Add first message context for new conversations
-      if (conversation.length === 1) {
-        messages.push({ role: 'system', content: FIRST_MESSAGE_CONTEXT });
-      }
+      const messages: any[] = [];
 
       // Add conversation history
       conversation.forEach(msg => {
@@ -580,7 +564,19 @@ class EnhancedConversationService {
         .map(msg => `${msg.role === 'user' ? 'User' : 'Anna'}: ${msg.content}`)
         .join('\n\n');
 
-      const prompt = generateWellnessSummaryPrompt(transcription, extractedUserInfo);
+      // Generate wellness summary prompt
+      const prompt = `Generate a wellness summary for this user:
+
+EXTRACTED DATA:
+${JSON.stringify(extractedUserInfo, null, 2)}
+
+CONVERSATION HIGHLIGHTS:
+${conversationHistory.slice(-10).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+
+Create a structured wellness summary with key insights and recommendations.`;
+
+      // Load wellness summary system prompt from server
+      const wellnessSummarySystemPrompt = await promptConfigService.getWellnessSummarySystemPrompt();
       
       // Try GPT-5 first, fallback to GPT-4 if it fails
       let response;
@@ -588,7 +584,7 @@ class EnhancedConversationService {
         response = await this.openai.chat.completions.create({
           model: 'gpt-5',
           messages: [
-            { role: 'system', content: WELLNESS_SUMMARY_SYSTEM_PROMPT },
+            { role: 'system', content: wellnessSummarySystemPrompt },
             { role: 'user', content: prompt }
           ],
           max_completion_tokens: 2500 // GPT-5 uses max_completion_tokens
@@ -598,7 +594,7 @@ class EnhancedConversationService {
         response = await this.openai.chat.completions.create({
           model: 'gpt-4',
           messages: [
-            { role: 'system', content: WELLNESS_SUMMARY_SYSTEM_PROMPT },
+            { role: 'system', content: wellnessSummarySystemPrompt },
             { role: 'user', content: prompt }
           ],
           max_tokens: 2500

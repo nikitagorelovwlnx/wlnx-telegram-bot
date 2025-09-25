@@ -8,8 +8,8 @@ import { WellnessStage } from '../types';
 
 export interface StagePromptConfig {
   stage: WellnessStage;
-  systemPrompt: string;
-  stagePrompt: string;
+  questionPrompt: string;  // Промпт для генерации вопросов на этом этапе
+  extractionPrompt: string; // Промпт для извлечения данных из ответа пользователя
   introductionMessage: string;
   requiredFields: string[];
   completionCriteria: string;
@@ -25,10 +25,33 @@ export interface PromptsResponse {
   lastUpdated?: string;
 }
 
+export interface FormSchemaResponse {
+  success: boolean;
+  data: {
+    schema: any; // Wellness form schema
+    version?: string;
+    description?: string;
+  };
+  lastUpdated?: string;
+}
+
+export interface ConversationPromptsResponse {
+  success: boolean;
+  data: {
+    conversationSystemPrompt: string;
+    conversationPersonaPrompt: string;
+    firstMessageContext: string;
+    wellnessSummarySystemPrompt: string;
+  };
+  version?: string;
+  lastUpdated?: string;
+}
+
 class PromptConfigService {
-  private cache: Map<string, PromptsResponse> = new Map();
+  private cache: Map<string, any> = new Map();
   private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes
   private lastFetchTime: number = 0;
+  private lastSchemaFetchTime: number = 0;
 
   /**
    * Load prompt configuration from server
@@ -47,7 +70,7 @@ class PromptConfigService {
 
       logger.info('Fetching prompt configuration from server...');
       
-      const response = await fetch(`${config.apiBaseUrl}/api/prompts/wellness-stages`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/prompts`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -95,6 +118,167 @@ class PromptConfigService {
   }
 
   /**
+   * Load form schema from server
+   */
+  async loadFormSchema(): Promise<FormSchemaResponse | null> {
+    try {
+      // Check cache first
+      const now = Date.now();
+      if (now - this.lastSchemaFetchTime < this.cacheExpiry) {
+        const cached = this.cache.get('form_schema');
+        if (cached) {
+          logger.info('Using cached form schema');
+          return cached;
+        }
+      }
+
+      logger.info('Fetching form schema from server...');
+      
+      const response = await fetch(`${config.apiBaseUrl}/api/form-schemas`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'WLNX-Telegram-Bot/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json() as FormSchemaResponse;
+      
+      if (!data.success || !data.data || !data.data.schema) {
+        throw new Error('Invalid form schema response format from server');
+      }
+
+      // Cache the result
+      this.cache.set('form_schema', data);
+      this.lastSchemaFetchTime = now;
+
+      logger.info(`Loaded form schema from server (version: ${data.data.version || 'unknown'})`);
+      return data;
+
+    } catch (error) {
+      logger.error('Failed to load form schema from server:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get wellness form schema from server
+   */
+  async getFormSchema(): Promise<any> {
+    const schemaResponse = await this.loadFormSchema();
+    if (schemaResponse?.data.schema) {
+      return schemaResponse.data.schema;
+    }
+
+    // Fallback to default schema structure
+    logger.warn('Using fallback form schema');
+    return {
+      stages: [
+        'demographics_baseline',
+        'biometrics_habits', 
+        'lifestyle_context',
+        'medical_history',
+        'goals_preferences'
+      ],
+      fields: {
+        demographics_baseline: ['age', 'gender', 'weight', 'height', 'location'],
+        biometrics_habits: ['sleep_duration', 'daily_steps', 'stress_level'],
+        lifestyle_context: ['work_schedule', 'workload'],
+        medical_history: ['chronic_conditions', 'medications'],
+        goals_preferences: ['health_goals', 'activity_preferences']
+      }
+    };
+  }
+
+  /**
+   * Load conversation prompts from server  
+   */
+  async loadConversationPrompts(): Promise<ConversationPromptsResponse | null> {
+    try {
+      // Check cache first
+      const now = Date.now();
+      if (now - this.lastFetchTime < this.cacheExpiry) {
+        const cached = this.cache.get('conversation_prompts');
+        if (cached) {
+          logger.info('Using cached conversation prompts');
+          return cached;
+        }
+      }
+
+      logger.info('Fetching conversation prompts from server...');
+      
+      const response = await fetch(`${config.apiBaseUrl}/api/conversation-prompts`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'WLNX-Telegram-Bot/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json() as ConversationPromptsResponse;
+      
+      if (!data.success || !data.data) {
+        throw new Error('Invalid conversation prompts response format from server');
+      }
+
+      // Cache the result
+      this.cache.set('conversation_prompts', data);
+      this.lastFetchTime = now;
+
+      logger.info(`Loaded conversation prompts from server (version: ${data.version || 'unknown'})`);
+      return data;
+
+    } catch (error) {
+      logger.error('Failed to load conversation prompts from server:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get conversation system prompt
+   */
+  async getConversationSystemPrompt(): Promise<string> {
+    const prompts = await this.loadConversationPrompts();
+    return prompts?.data.conversationSystemPrompt || 
+      `You are Anna, a professional wellness consultant. Provide personalized health and wellness advice.`;
+  }
+
+  /**
+   * Get conversation persona prompt  
+   */
+  async getConversationPersonaPrompt(): Promise<string> {
+    const prompts = await this.loadConversationPrompts();
+    return prompts?.data.conversationPersonaPrompt ||
+      `You are Anna, a warm and empathetic wellness consultant.`;
+  }
+
+  /**
+   * Get first message context
+   */
+  async getFirstMessageContext(): Promise<string> {
+    const prompts = await this.loadConversationPrompts();
+    return prompts?.data.firstMessageContext ||
+      `This is the beginning of your conversation with a new user.`;
+  }
+
+  /**
+   * Get wellness summary system prompt
+   */
+  async getWellnessSummarySystemPrompt(): Promise<string> {
+    const prompts = await this.loadConversationPrompts();
+    return prompts?.data.wellnessSummarySystemPrompt ||
+      `You are a wellness data analyst. Generate a comprehensive wellness summary.`;
+  }
+
+  /**
    * Get system prompt for wellness extraction
    */
   async getSystemPrompt(): Promise<string> {
@@ -109,20 +293,33 @@ class PromptConfigService {
   }
 
   /**
-   * Get stage-specific prompt
+   * Get extraction prompt for stage (for ChatGPT data extraction)
    */
-  async getStagePrompt(stage: WellnessStage): Promise<string> {
+  async getExtractionPrompt(stage: WellnessStage): Promise<string> {
     const config = await this.loadPromptConfig();
     if (config?.data.stages) {
       const stageConfig = config.data.stages.find(s => s.stage === stage);
-      if (stageConfig?.stagePrompt) {
-        return stageConfig.stagePrompt;
+      if (stageConfig?.extractionPrompt) {
+        return stageConfig.extractionPrompt;
       }
     }
 
-    // Fallback to hardcoded prompts
-    logger.warn(`Using fallback prompt for stage: ${stage}`);
-    return this.getFallbackStagePrompt(stage);
+    throw new Error(`No extraction prompt found for stage: ${stage}`);
+  }
+
+  /**
+   * Get question prompt for stage (for generating questions)
+   */
+  async getQuestionPrompt(stage: WellnessStage): Promise<string> {
+    const config = await this.loadPromptConfig();
+    if (config?.data.stages) {
+      const stageConfig = config.data.stages.find(s => s.stage === stage);
+      if (stageConfig?.questionPrompt) {
+        return stageConfig.questionPrompt;
+      }
+    }
+
+    throw new Error(`No question prompt found for stage: ${stage}`);
   }
 
   /**
@@ -164,7 +361,8 @@ class PromptConfigService {
   clearCache(): void {
     this.cache.clear();
     this.lastFetchTime = 0;
-    logger.info('Prompt configuration cache cleared');
+    this.lastSchemaFetchTime = 0;
+    logger.info('Prompt configuration and form schema cache cleared');
   }
 
   // Fallback methods (use local prompts if server unavailable)

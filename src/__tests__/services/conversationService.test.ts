@@ -74,7 +74,7 @@ describe('ConversationService', () => {
       expect(validCall[0].messages).toEqual(expect.arrayContaining([
         expect.objectContaining({
           role: 'system',
-          content: expect.stringContaining('wellness data analyst')
+          content: expect.stringContaining('wellness consultant')
         }),
         expect.objectContaining({
           role: 'assistant', 
@@ -116,7 +116,7 @@ describe('ConversationService', () => {
       expect(validCall[0].messages).toEqual(expect.arrayContaining([
         expect.objectContaining({
           role: 'system',
-          content: expect.stringContaining('first time')
+          content: expect.stringContaining('beginning of your conversation')
         })
       ]));
       expect(validCall[0].temperature).toBe(0.7);
