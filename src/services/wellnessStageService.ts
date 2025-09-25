@@ -183,8 +183,17 @@ class WellnessStageService {
       throw new Error('OpenAI service not available');
     }
 
-    // Получаем question промпт с сервера для генерации вопроса
-    const questionPrompt = await promptConfigService.getQuestionPrompt(stage);
+    let questionPrompt: string;
+    try {
+      // Получаем question промпт с сервера для генерации вопроса
+      questionPrompt = await promptConfigService.getQuestionPrompt(stage);
+    } catch (serverError) {
+      logger.error(`Failed to load question prompt for stage ${stage}:`, serverError);
+      throw new Error(
+        `Unable to generate question for wellness stage "${stage}". ` +
+        `Server configuration unavailable. Please try again later or contact support.`
+      );
+    }
     
     const messages = [
       { 
@@ -225,8 +234,17 @@ class WellnessStageService {
       throw new Error('OpenAI service not available');
     }
 
-    // Получаем extraction промпт с сервера для извлечения данных
-    const extractionPrompt = await promptConfigService.getExtractionPrompt(request.stage);
+    let extractionPrompt: string;
+    try {
+      // Получаем extraction промпт с сервера для извлечения данных
+      extractionPrompt = await promptConfigService.getExtractionPrompt(request.stage);
+    } catch (serverError) {
+      logger.error(`Failed to load extraction prompt for stage ${request.stage}:`, serverError);
+      throw new Error(
+        `Unable to process wellness data for stage "${request.stage}". ` +
+        `Server configuration unavailable. Please try again later.`
+      );
+    }
     
     const messages = [
       { 

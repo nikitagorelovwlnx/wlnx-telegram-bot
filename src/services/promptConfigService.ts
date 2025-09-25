@@ -6,23 +6,20 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { WellnessStage } from '../types';
 
-export interface StagePromptConfig {
-  stage: WellnessStage;
-  questionPrompt: string;  // Промпт для генерации вопросов на этом этапе
-  extractionPrompt: string; // Промпт для извлечения данных из ответа пользователя
-  introductionMessage: string;
-  requiredFields: string[];
-  completionCriteria: string;
+export interface StagePrompts {
+  question_prompt: string;  // Промпт для генерации вопросов на этом этапе
+  extraction_prompt: string; // Промпт для извлечения данных из ответа пользователя
 }
 
 export interface PromptsResponse {
   success: boolean;
   data: {
-    systemPrompt: string;
-    stages: StagePromptConfig[];
+    demographics_baseline: StagePrompts;
+    biometrics_habits: StagePrompts;
+    lifestyle_context: StagePrompts;
+    medical_history: StagePrompts;
+    goals_preferences: StagePrompts;
   };
-  version?: string;
-  lastUpdated?: string;
 }
 
 export interface FormSchemaResponse {
@@ -52,9 +49,40 @@ class PromptConfigService {
   private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes
   private lastFetchTime: number = 0;
   private lastSchemaFetchTime: number = 0;
+  private maxRetries: number = 3;
+  private retryDelay: number = 1000; // 1 second
 
   /**
-   * Load prompt configuration from server
+   * Retry helper with exponential backoff
+   */
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>, 
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        
+        if (attempt === this.maxRetries) {
+          logger.error(`${operationName} failed after ${this.maxRetries} attempts:`, lastError);
+          throw lastError;
+        }
+        
+        const delay = this.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        logger.warn(`${operationName} attempt ${attempt} failed, retrying in ${delay}ms:`, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError;
+  }
+
+  /**
+   * Load prompt configuration from server with retry logic
    */
   async loadPromptConfig(): Promise<PromptsResponse | null> {
     try {
@@ -70,19 +98,53 @@ class PromptConfigService {
 
       logger.info('Fetching prompt configuration from server...');
       
-      const response = await fetch(`${config.apiBaseUrl}/api/prompts`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'WLNX-Telegram-Bot/1.0'
+      const data = await this.retryWithBackoff(async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        let response: Response;
+        try {
+          response = await fetch(`${config.apiBaseUrl}/api/prompts`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'WLNX-Telegram-Bot/1.0'
+            },
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+        } finally {
+          clearTimeout(timeoutId);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-      }
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
 
-      const data = await response.json() as PromptsResponse;
+        const data = await response.json() as PromptsResponse;
+        
+        if (!data.success || !data.data) {
+          throw new Error('Invalid prompts response format from server');
+        }
+        
+        // Validate all required stages are present
+        const requiredStages: WellnessStage[] = [
+          'demographics_baseline',
+          'biometrics_habits', 
+          'lifestyle_context',
+          'medical_history',
+          'goals_preferences'
+        ];
+        
+        for (const stage of requiredStages) {
+          if (!data.data[stage] || !data.data[stage].question_prompt || !data.data[stage].extraction_prompt) {
+            throw new Error(`Missing or invalid prompts for stage: ${stage}`);
+          }
+        }
+        
+        return data;
+      }, 'Load prompts from server');
       
       if (!data.success || !data.data || !data.data.stages) {
         throw new Error('Invalid response format from server');
@@ -296,12 +358,13 @@ class PromptConfigService {
    * Get extraction prompt for stage (for ChatGPT data extraction)
    */
   async getExtractionPrompt(stage: WellnessStage): Promise<string> {
+    if (stage === 'completed') {
+      throw new Error(`Stage 'completed' does not have prompts`);
+    }
+    
     const config = await this.loadPromptConfig();
-    if (config?.data.stages) {
-      const stageConfig = config.data.stages.find(s => s.stage === stage);
-      if (stageConfig?.extractionPrompt) {
-        return stageConfig.extractionPrompt;
-      }
+    if (config?.data && config.data[stage as keyof typeof config.data]) {
+      return config.data[stage as keyof typeof config.data].extraction_prompt;
     }
 
     throw new Error(`No extraction prompt found for stage: ${stage}`);
@@ -311,12 +374,13 @@ class PromptConfigService {
    * Get question prompt for stage (for generating questions)
    */
   async getQuestionPrompt(stage: WellnessStage): Promise<string> {
+    if (stage === 'completed') {
+      throw new Error(`Stage 'completed' does not have prompts`);
+    }
+    
     const config = await this.loadPromptConfig();
-    if (config?.data.stages) {
-      const stageConfig = config.data.stages.find(s => s.stage === stage);
-      if (stageConfig?.questionPrompt) {
-        return stageConfig.questionPrompt;
-      }
+    if (config?.data && config.data[stage as keyof typeof config.data]) {
+      return config.data[stage as keyof typeof config.data].question_prompt;
     }
 
     throw new Error(`No question prompt found for stage: ${stage}`);

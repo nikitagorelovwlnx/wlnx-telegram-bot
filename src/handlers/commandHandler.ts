@@ -648,17 +648,36 @@ export class CommandHandler {
             conversationActive: false // Disable normal conversation during wellness collection
           });
 
-          // Generate first wellness question using ChatGPT
-          const firstQuestion = await wellnessStageService.generateQuestion(
-            wellnessProgress.currentStage, 
-            [] // No previous context for first question
-          );
-          
-          await ctx.reply(
-            `Perfect! Now we know each other 🎉\n\n` +
-            `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
-            `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
-          );
+          try {
+            // Generate first wellness question using ChatGPT
+            const firstQuestion = await wellnessStageService.generateQuestion(
+              wellnessProgress.currentStage, 
+              [] // No previous context for first question
+            );
+            
+            await ctx.reply(
+              `Perfect! Now we know each other 🎉\n\n` +
+              `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
+              `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
+            );
+          } catch (wellnessError) {
+            logger.error('Failed to start wellness collection:', wellnessError);
+            
+            // Fallback to normal conversation if wellness system fails
+            userService.setUser(userInfo.id.toString(), {
+              email: text,
+              isAuthenticated: true,
+              registrationStep: undefined,
+              conversationActive: true,
+              conversationHistory: []
+            });
+
+            await ctx.reply(
+              `Perfect! Now we know each other 🎉\n\n` +
+              `I'd like to learn more about you, but our wellness assessment system is temporarily unavailable.\n\n` +
+              `Feel free to tell me about yourself - your health goals, lifestyle, or any questions you have!`
+            );
+          }
           break;
       }
 

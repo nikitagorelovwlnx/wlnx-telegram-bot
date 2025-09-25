@@ -204,16 +204,13 @@ describe('ConversationService - Fixed Tests', () => {
         call[0].model === 'gpt-5' || call[0].model === 'gpt-4'
       );
       expect(validCall).toBeDefined();
-      expect(validCall[0].messages).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          role: 'assistant',
-          content: expect.stringContaining('You are Anna')
-        }),
+      // Now conversationService just passes messages directly without system prompts
+      expect(validCall[0].messages).toEqual([
         expect.objectContaining({
           role: 'user',
           content: 'Hi Anna!'
         })
-      ]));
+      ]);
       expect(validCall[0].temperature).toBe(0.7);
       
       if (validCall[0].model === 'gpt-5') {
