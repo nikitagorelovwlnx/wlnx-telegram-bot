@@ -32,17 +32,6 @@ export interface FormSchemaResponse {
   lastUpdated?: string;
 }
 
-export interface ConversationPromptsResponse {
-  success: boolean;
-  data: {
-    conversationSystemPrompt: string;
-    conversationPersonaPrompt: string;
-    firstMessageContext: string;
-    wellnessSummarySystemPrompt: string;
-  };
-  version?: string;
-  lastUpdated?: string;
-}
 
 class PromptConfigService {
   private cache: Map<string, any> = new Map();
@@ -237,88 +226,39 @@ class PromptConfigService {
     };
   }
 
-  /**
-   * Load conversation prompts from server  
-   */
-  async loadConversationPrompts(): Promise<ConversationPromptsResponse | null> {
-    try {
-      // Check cache first
-      const now = Date.now();
-      if (now - this.lastFetchTime < this.cacheExpiry) {
-        const cached = this.cache.get('conversation_prompts');
-        if (cached) {
-          logger.info('Using cached conversation prompts');
-          return cached;
-        }
-      }
-
-      logger.info('Fetching conversation prompts from server...');
-      
-      const response = await fetch(`${config.apiBaseUrl}/api/conversation-prompts`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'WLNX-Telegram-Bot/1.0'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json() as ConversationPromptsResponse;
-      
-      if (!data.success || !data.data) {
-        throw new Error('Invalid conversation prompts response format from server');
-      }
-
-      // Cache the result
-      this.cache.set('conversation_prompts', data);
-      this.lastFetchTime = now;
-
-      logger.info(`Loaded conversation prompts from server (version: ${data.version || 'unknown'})`);
-      return data;
-
-    } catch (error) {
-      logger.error('Failed to load conversation prompts from server:', error);
-      return null;
-    }
-  }
 
   /**
-   * Get conversation system prompt
+   * Get conversation system prompt - hardcoded Anna's character
    */
   async getConversationSystemPrompt(): Promise<string> {
-    const prompts = await this.loadConversationPrompts();
-    return prompts?.data.conversationSystemPrompt || 
-      `You are Anna, a professional wellness consultant. Provide personalized health and wellness advice.`;
+    return `You are Anna, a professional wellness consultant. You are warm, empathetic, and supportive. 
+    You help people with nutrition, fitness, and health in general. Always respond in a friendly, caring manner 
+    as if you're a real person having a conversation. Keep responses natural and conversational.`;
   }
 
   /**
-   * Get conversation persona prompt  
+   * Get conversation persona prompt - hardcoded Anna's character
    */
   async getConversationPersonaPrompt(): Promise<string> {
-    const prompts = await this.loadConversationPrompts();
-    return prompts?.data.conversationPersonaPrompt ||
-      `You are Anna, a warm and empathetic wellness consultant.`;
+    return `You are Anna, a warm and empathetic wellness consultant. You speak naturally and personally, 
+    like a caring friend who happens to be a health professional. You remember context from the conversation 
+    and build on previous topics. You're encouraging but realistic in your advice.`;
   }
 
   /**
-   * Get first message context
+   * Get first message context - hardcoded
    */
   async getFirstMessageContext(): Promise<string> {
-    const prompts = await this.loadConversationPrompts();
-    return prompts?.data.firstMessageContext ||
-      `This is the beginning of your conversation with a new user.`;
+    return `This is the beginning of your conversation with a new user. Be warm and welcoming as Anna.`;
   }
 
   /**
-   * Get wellness summary system prompt
+   * Get wellness summary system prompt - hardcoded
    */
   async getWellnessSummarySystemPrompt(): Promise<string> {
-    const prompts = await this.loadConversationPrompts();
-    return prompts?.data.wellnessSummarySystemPrompt ||
-      `You are a wellness data analyst. Generate a comprehensive wellness summary.`;
+    return `You are Anna, a wellness data analyst. Generate a comprehensive wellness summary based on the user's 
+    conversation and extracted data. Create structured insights and personalized recommendations in a warm, 
+    professional tone that matches Anna's caring personality.`;
   }
 
   /**

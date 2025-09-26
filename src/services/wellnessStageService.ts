@@ -28,16 +28,15 @@ const STAGE_PROGRESSION: Record<WellnessStage, WellnessStage> = {
 };
 
 class WellnessStageService {
-  private openai: OpenAI | null = null;
+  private openai: OpenAI;
 
   constructor() {
-    if (config.openaiApiKey) {
-      this.openai = new OpenAI({
-        apiKey: config.openaiApiKey,
-      });
-    } else {
-      logger.warn('OpenAI API key not found. GPT extraction will be unavailable.');
+    if (!config.openaiApiKey) {
+      throw new Error('OpenAI API key is required');
     }
+    this.openai = new OpenAI({
+      apiKey: config.openaiApiKey,
+    });
   }
 
   /**
@@ -89,9 +88,6 @@ class WellnessStageService {
     });
 
     // Всегда отправляем каждый ответ пользователя в ChatGPT для извлечения данных
-    if (!this.openai) {
-      throw new Error('OpenAI API key required for wellness form data extraction.');
-    }
 
     // Отправляем в ChatGPT для извлечения данных
     const gptResult = await this.extractDataWithGPT({
@@ -179,9 +175,6 @@ class WellnessStageService {
    * Генерация натурального вопроса для этапа с учетом контекста
    */
   async generateQuestion(stage: WellnessStage, conversationContext: ConversationMessage[]): Promise<string> {
-    if (!this.openai) {
-      throw new Error('OpenAI service not available');
-    }
 
     let questionPrompt: string;
     try {
@@ -195,10 +188,16 @@ class WellnessStageService {
       );
     }
     
+    // Get Anna's persona to maintain character consistency
+    const personaPrompt = await promptConfigService.getConversationPersonaPrompt();
+
+    // Combine question prompt with Anna's character
+    const fullSystemPrompt = `${questionPrompt}\n\n${personaPrompt}\n\nAlways maintain Anna's caring, professional personality when asking questions.`;
+
     const messages = [
       { 
         role: 'system', 
-        content: questionPrompt
+        content: fullSystemPrompt
       },
       // Добавляем весь предыдущий контекст беседы
       ...conversationContext.map(msg => ({
@@ -230,9 +229,6 @@ class WellnessStageService {
    * Извлечение данных с помощью ChatGPT (использует удаленные промпты)
    */
   private async extractDataWithGPT(request: GPTExtractionRequest): Promise<GPTExtractionResponse> {
-    if (!this.openai) {
-      throw new Error('OpenAI service not available');
-    }
 
     let extractionPrompt: string;
     try {
@@ -404,12 +400,6 @@ class WellnessStageService {
     return questionMap[missingField] || `Tell me more about ${missingField}.`;
   }
 
-  /**
-   * Проверяет доступность сервиса
-   */
-  isAvailable(): boolean {
-    return this.openai !== null; // Требует OpenAI для интернационального извлечения
-  }
 
   /**
    * Собирает финальные данные из всех этапов

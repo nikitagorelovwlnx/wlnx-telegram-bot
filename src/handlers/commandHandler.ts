@@ -619,24 +619,6 @@ export class CommandHandler {
           // Complete registration and start wellness data collection
           const { wellnessStageService } = await import('../services/wellnessStageService');
           
-          // Check if wellness service is available
-          if (!wellnessStageService.isAvailable()) {
-            // Fallback - complete registration without wellness collection
-            userService.setUser(userInfo.id.toString(), {
-              email: text,
-              isAuthenticated: true,
-              registrationStep: undefined,
-              conversationActive: true,
-              conversationHistory: []
-            });
-
-            await ctx.reply(
-              `Perfect! Now we know each other 🎉\n\n` +
-              'Tell me, how are you doing? What\'s bothering you or what interests you?'
-            );
-            return;
-          }
-
           // Initialize wellness data collection process
           const wellnessProgress = wellnessStageService.initializeWellnessProcess();
           
@@ -648,36 +630,17 @@ export class CommandHandler {
             conversationActive: false // Disable normal conversation during wellness collection
           });
 
-          try {
-            // Generate first wellness question using ChatGPT
-            const firstQuestion = await wellnessStageService.generateQuestion(
-              wellnessProgress.currentStage, 
-              [] // No previous context for first question
-            );
-            
-            await ctx.reply(
-              `Perfect! Now we know each other 🎉\n\n` +
-              `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
-              `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
-            );
-          } catch (wellnessError) {
-            logger.error('Failed to start wellness collection:', wellnessError);
-            
-            // Fallback to normal conversation if wellness system fails
-            userService.setUser(userInfo.id.toString(), {
-              email: text,
-              isAuthenticated: true,
-              registrationStep: undefined,
-              conversationActive: true,
-              conversationHistory: []
-            });
-
-            await ctx.reply(
-              `Perfect! Now we know each other 🎉\n\n` +
-              `I'd like to learn more about you, but our wellness assessment system is temporarily unavailable.\n\n` +
-              `Feel free to tell me about yourself - your health goals, lifestyle, or any questions you have!`
-            );
-          }
+          // Generate first wellness question using ChatGPT
+          const firstQuestion = await wellnessStageService.generateQuestion(
+            wellnessProgress.currentStage, 
+            [] // No previous context for first question
+          );
+          
+          await ctx.reply(
+            `Perfect! Now we know each other 🎉\n\n` +
+            `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
+            `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
+          );
           break;
       }
 
@@ -707,31 +670,7 @@ export class CommandHandler {
       await ctx.sendChatAction('typing');
 
       // Обрабатываем ответ пользователя через ChatGPT
-      let result;
-      try {
-        result = await wellnessStageService.processUserResponse(text, user.wellnessProgress);
-      } catch (error) {
-        logger.error('Wellness stage processing error:', error);
-        
-        if (error instanceof Error && error.message.includes('OpenAI API key')) {
-          await ctx.reply(
-            '❌ Система поэтапного заполнения недоступна (нет доступа к ChatGPT).\n\n' +
-            'Используйте обычное общение - просто расскажите о себе.'
-          );
-          
-          // Переключаемся обратно на обычный разговор
-          userService.setUser(userInfo.id.toString(), { 
-            wellnessProgress: undefined,
-            conversationActive: true 
-          });
-          return;
-        }
-        
-        await ctx.reply(
-          '❌ Произошла ошибка при обработке ответа. Попробуйте еще раз или используйте /wellness_restart для перезапуска формы.'
-        );
-        return;
-      }
+      const result = await wellnessStageService.processUserResponse(text, user.wellnessProgress);
       
       // Обновляем данные пользователя
       userService.setUser(userInfo.id.toString(), { 
