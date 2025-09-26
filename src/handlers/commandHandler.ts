@@ -701,29 +701,55 @@ export class CommandHandler {
         try {
           const { apiService } = await import('../services/apiService');
           
-          // Build FULL transcription from ALL stages and messages
-          const allMessages: Array<{role: string, content: string}> = [];
+          // Build FULL transcription - reconstruct complete conversation chronologically
+          const conversationFlow: Array<{role: string, content: string}> = [];
           
-          // Add registration info
-          allMessages.push({
+          // 1. Registration flow (reconstruct from user data)
+          conversationFlow.push({
             role: 'system',
             content: `User registered: ${userInfo.firstName || 'Unknown'} (${user.email})`
           });
           
-          // Add messages from ALL stages in order
-          const stageOrder: Array<keyof typeof result.updatedProgress.messageHistory> = [
-            'demographics_baseline', 'biometrics_habits', 'lifestyle_context', 
-            'medical_history', 'goals_preferences'
-          ];
+          conversationFlow.push({ role: 'user', content: '/start' });
+          conversationFlow.push({ 
+            role: 'assistant', 
+            content: "Hey! 😊 I'm Anna\n\nI'm a wellness consultant, work with people online. I help with nutrition, fitness, health in general\n\nWhat's your name?" 
+          });
           
-          for (const stage of stageOrder) {
-            const stageMessages = result.updatedProgress.messageHistory[stage] || [];
-            allMessages.push(...stageMessages);
+          if (userInfo.firstName) {
+            conversationFlow.push({ role: 'user', content: userInfo.firstName });
+            conversationFlow.push({ 
+              role: 'assistant', 
+              content: `Nice to meet you, ${userInfo.firstName}! 😊\n\nNow I need your email for registration:` 
+            });
           }
           
+          if (user.email) {
+            conversationFlow.push({ role: 'user', content: user.email });
+            conversationFlow.push({ 
+              role: 'assistant', 
+              content: "Perfect! Now we know each other 🎉\n\nI'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n**Stage 1/5: Demographics & Baseline**" 
+            });
+          }
+          
+          // 2. Add wellness stage messages in chronological order
+          const currentStageMessages = result.updatedProgress.messageHistory[result.updatedProgress.currentStage] || [];
+          conversationFlow.push(...currentStageMessages);
+          
+          // 3. Add current exchange (user input + bot response)
+          conversationFlow.push({
+            role: 'user',
+            content: text
+          });
+          
+          conversationFlow.push({
+            role: 'assistant', 
+            content: result.botResponse
+          });
+          
           // Create full conversation transcript with clear sender markers
-          const fullTranscription = allMessages
-            .map(msg => {
+          const fullTranscription = conversationFlow
+            .map((msg: {role: string, content: string}) => {
               if (msg.role === 'system') return `[SYSTEM] ${msg.content}`;
               if (msg.role === 'user') return `[USER] ${msg.content}`;
               return `[ASSISTANT] ${msg.content}`;
@@ -736,7 +762,7 @@ export class CommandHandler {
           logger.info('🔄 Updating wellness session transcription:', { 
             email: user.email,
             stage: result.updatedProgress.currentStage,
-            totalMessages: allMessages.length,
+            totalMessages: conversationFlow.length,
             transcriptionLength: fullTranscription.length
           });
           

@@ -117,7 +117,7 @@ class WellnessStageService {
     progress.lastActiveAt = new Date().toISOString();
 
     // Проверяем, завершен ли этап
-    const shouldAdvanceStage = await this.isStageComplete(stage, progress.stageData[stage] || {});
+    const shouldAdvanceStage = await this.isStageComplete(stage, progress.stageData[stage] || {}, progress);
     
     let botResponse: string;
     
@@ -310,20 +310,32 @@ class WellnessStageService {
 
   /**
    * Проверяет, завершен ли этап на основе собранных данных
+   * ОГРАНИЧЕНИЕ: Максимум 2 вопроса на этап
    */
-  private async isStageComplete(stage: WellnessStage, stageData: Partial<WellnessData>): Promise<boolean> {
-    const requiredFields = await promptConfigService.getRequiredFields(stage);
+  private async isStageComplete(stage: WellnessStage, stageData: Partial<WellnessData>, progress: WellnessStageProgress): Promise<boolean> {
+    // Считаем количество вопросов в текущем этапе
+    const currentStageMessages = progress.messageHistory[stage] || [];
+    const userMessagesCount = currentStageMessages.filter(msg => msg.role === 'user').length;
     
-    // Если нет обязательных полей, этап считается завершенным
-    if (requiredFields.length === 0) {
-      return Object.keys(stageData).length > 0; // Хотя бы что-то есть
+    // ЖЕСТКОЕ ОГРАНИЧЕНИЕ: Максимум 2 вопроса на этап
+    if (userMessagesCount >= 2) {
+      logger.info(`🔄 Stage ${stage} completed: reached maximum 2 questions limit`, {
+        userMessagesCount,
+        stageDataKeys: Object.keys(stageData)
+      });
+      return true;
     }
-
-    // Проверяем наличие всех обязательных полей
-    return requiredFields.every(field => {
-      const value = (stageData as any)[field];
-      return value !== undefined && value !== null && value !== '';
-    });
+    
+    // Если есть хотя бы какие-то данные после первого вопроса, можно завершить этап
+    if (userMessagesCount >= 1 && Object.keys(stageData).length > 0) {
+      logger.info(`🔄 Stage ${stage} completed: has data after 1 question`, {
+        userMessagesCount,
+        stageDataKeys: Object.keys(stageData)
+      });
+      return true;
+    }
+    
+    return false;
   }
 
   /**
@@ -422,6 +434,12 @@ class WellnessStageService {
   getFinalWellnessData(progress: WellnessStageProgress): WellnessData {
     const finalData: WellnessData = {};
     
+    logger.info('🔍 Building final wellness data:', {
+      stageDataKeys: Object.keys(progress.stageData),
+      stageDataValues: progress.stageData,
+      currentStage: progress.currentStage
+    });
+    
     // Объединяем данные из всех этапов
     Object.values(progress.stageData).forEach(stageData => {
       Object.assign(finalData, stageData);
@@ -432,6 +450,11 @@ class WellnessStageService {
       const heightM = finalData.height / 100;
       finalData.bmi = Math.round((finalData.weight / (heightM * heightM)) * 10) / 10;
     }
+
+    logger.info('✅ Final wellness data assembled:', {
+      finalDataKeys: Object.keys(finalData),
+      finalData: finalData
+    });
 
     return finalData;
   }
