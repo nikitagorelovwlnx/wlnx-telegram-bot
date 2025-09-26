@@ -146,6 +146,7 @@ export class CommandHandler {
           ...Markup.inlineKeyboard([
             [Markup.button.callback('📊 Statistics', 'admin_stats')],
             [Markup.button.callback('👥 Users', 'admin_users')],
+            [Markup.button.callback('🔄 Refresh Prompts', 'admin_refresh_prompts')],
             [Markup.button.callback('📢 Broadcast', 'admin_broadcast')],
             [Markup.button.callback('🔧 System', 'admin_system')]
           ])
@@ -279,6 +280,27 @@ export class CommandHandler {
 
     } catch (error) {
       handleError(ctx, error, 'Error creating new interview session');
+    }
+  }
+
+  // Reset wellness progress (for testing)
+  static async resetWellness(ctx: Context): Promise<void> {
+    try {
+      const userInfo = getUserInfo(ctx);
+      
+      // Reset wellness progress
+      userService.setUser(userInfo.id.toString(), {
+        wellnessProgress: undefined,
+        conversationHistory: [],
+        conversationActive: false
+      });
+
+      await ctx.reply('🔄 Wellness progress reset! You can now start the wellness form again.\n\nJust start talking to me and I\'ll guide you through the wellness questions! 😊');
+
+      logUserAction(ctx, 'reset_wellness');
+
+    } catch (error) {
+      handleError(ctx, error, 'Error resetting wellness progress');
     }
   }
 

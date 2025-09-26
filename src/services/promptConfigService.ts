@@ -7,8 +7,8 @@ import { logger } from '../utils/logger';
 import { WellnessStage } from '../types';
 
 export interface StagePrompts {
-  question_prompt: string;  // Промпт для генерации вопросов на этом этапе
-  extraction_prompt: string; // Промпт для извлечения данных из ответа пользователя
+  question_prompt: string;  // Prompt for generating questions at this stage
+  extraction_prompt: string; // Prompt for extracting data from user response
 }
 
 export interface PromptsResponse {
@@ -35,7 +35,7 @@ export interface FormSchemaResponse {
 
 class PromptConfigService {
   private cache: Map<string, any> = new Map();
-  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes
+  private cacheExpiry: number = process.env.NODE_ENV === 'development' ? 30 * 1000 : 2 * 60 * 1000; // 30 seconds in dev, 2 minutes in prod
   private lastFetchTime: number = 0;
   private lastSchemaFetchTime: number = 0;
   private maxRetries: number = 3;
@@ -71,21 +71,31 @@ class PromptConfigService {
   }
 
   /**
+   * Clear cache and force reload from server
+   */
+  clearCache(): void {
+    this.cache.clear();
+    this.lastFetchTime = 0;
+    this.lastSchemaFetchTime = 0;
+    logger.info('Prompt cache cleared - next request will fetch fresh data from server');
+  }
+
+  /**
    * Load prompt configuration from server with retry logic
    */
-  async loadPromptConfig(): Promise<PromptsResponse | null> {
+  async loadPromptConfig(forceRefresh: boolean = false): Promise<PromptsResponse | null> {
     try {
-      // Check cache first
+      // Check cache first (unless force refresh requested)
       const now = Date.now();
-      if (now - this.lastFetchTime < this.cacheExpiry) {
+      if (!forceRefresh && now - this.lastFetchTime < this.cacheExpiry) {
         const cached = this.cache.get('wellness_prompts');
         if (cached) {
-          logger.info('Using cached prompt configuration');
+          logger.info(`Using cached prompt configuration (expires in ${Math.round((this.cacheExpiry - (now - this.lastFetchTime)) / 1000)}s)`);
           return cached;
         }
       }
 
-      logger.info('Fetching prompt configuration from server...');
+      logger.info(`🔄 Fetching prompt configuration from server... ${forceRefresh ? '(forced refresh)' : '(cache expired)'}`);
       
       const data = await this.retryWithBackoff(async () => {
         const controller = new AbortController();
@@ -198,7 +208,7 @@ class PromptConfigService {
   }
 
   /**
-   * Get wellness form schema from server
+   * Get wellness form schema from server - ONLY from server
    */
   async getFormSchema(): Promise<any> {
     const schemaResponse = await this.loadFormSchema();
@@ -206,24 +216,7 @@ class PromptConfigService {
       return schemaResponse.data.schema;
     }
 
-    // Fallback to default schema structure
-    logger.warn('Using fallback form schema');
-    return {
-      stages: [
-        'demographics_baseline',
-        'biometrics_habits', 
-        'lifestyle_context',
-        'medical_history',
-        'goals_preferences'
-      ],
-      fields: {
-        demographics_baseline: ['age', 'gender', 'weight', 'height', 'location'],
-        biometrics_habits: ['sleep_duration', 'daily_steps', 'stress_level'],
-        lifestyle_context: ['work_schedule', 'workload'],
-        medical_history: ['chronic_conditions', 'medications'],
-        goals_preferences: ['health_goals', 'activity_preferences']
-      }
-    };
+    throw new Error('No form schema found on server');
   }
 
 
@@ -233,16 +226,10 @@ class PromptConfigService {
   async getConversationSystemPrompt(): Promise<string> {
     return `You are Anna, a professional wellness consultant. You are warm, empathetic, and supportive. 
     You help people with nutrition, fitness, and health in general. Always respond in a friendly, caring manner 
-    as if you're a real person having a conversation. Keep responses natural and conversational.`;
-  }
-
-  /**
-   * Get conversation persona prompt - hardcoded Anna's character
-   */
-  async getConversationPersonaPrompt(): Promise<string> {
-    return `You are Anna, a warm and empathetic wellness consultant. You speak naturally and personally, 
-    like a caring friend who happens to be a health professional. You remember context from the conversation 
-    and build on previous topics. You're encouraging but realistic in your advice.`;
+    as if you're a real person having a conversation. Keep responses natural and conversational.
+    
+    You speak naturally and personally, like a caring friend who happens to be a health professional. 
+    You remember context from the conversation and build on previous topics. You're encouraging but realistic in your advice.`;
   }
 
   /**
@@ -253,34 +240,47 @@ class PromptConfigService {
   }
 
   /**
-   * Get wellness summary system prompt - hardcoded
+   * Get wellness summary system prompt - ONLY from server
    */
   async getWellnessSummarySystemPrompt(): Promise<string> {
-    return `You are Anna, a wellness data analyst. Generate a comprehensive wellness summary based on the user's 
-    conversation and extracted data. Create structured insights and personalized recommendations in a warm, 
-    professional tone that matches Anna's caring personality.`;
+    // Always force refresh to get latest prompts from server
+    const config = await this.loadPromptConfig(true);
+    if (config?.data && (config.data as any).wellness_summary?.system_prompt) {
+      return (config.data as any).wellness_summary.system_prompt;
+    }
+    
+    throw new Error('No wellness summary system prompt found on server');
   }
 
   /**
-   * Get system prompt for wellness extraction (not available in new API format)
+   * Get system prompt for wellness extraction - ONLY from server
    */
   async getSystemPrompt(): Promise<string> {
-    // New API format doesn't have systemPrompt, use fallback
-    logger.warn('Using fallback system prompt - not available in new API format');
-    return this.getFallbackSystemPrompt();
+    // Always force refresh to get latest prompts from server
+    const config = await this.loadPromptConfig(true);
+    if (config?.data && (config.data as any).system_prompt) {
+      return (config.data as any).system_prompt;
+    }
+    
+    throw new Error('No system prompt found on server');
   }
 
   /**
    * Get extraction prompt for stage (for ChatGPT data extraction)
+   * Always fetches fresh data from server to ensure latest prompts
    */
   async getExtractionPrompt(stage: WellnessStage): Promise<string> {
     if (stage === 'completed') {
       throw new Error(`Stage 'completed' does not have prompts`);
     }
     
-    const config = await this.loadPromptConfig();
+    // Always force refresh to get latest prompts from server
+    logger.info(`🎯 Getting extraction prompt for stage: ${stage}`);
+    const config = await this.loadPromptConfig(true);
     if (config?.data && config.data[stage as keyof typeof config.data]) {
-      return config.data[stage as keyof typeof config.data].extraction_prompt;
+      const prompt = config.data[stage as keyof typeof config.data].extraction_prompt;
+      logger.info(`✅ Loaded extraction prompt for ${stage}: ${prompt.substring(0, 100)}...`);
+      return prompt;
     }
 
     throw new Error(`No extraction prompt found for stage: ${stage}`);
@@ -288,169 +288,43 @@ class PromptConfigService {
 
   /**
    * Get question prompt for stage (for generating questions)
+   * Always fetches fresh data from server to ensure latest prompts
    */
   async getQuestionPrompt(stage: WellnessStage): Promise<string> {
     if (stage === 'completed') {
       throw new Error(`Stage 'completed' does not have prompts`);
     }
     
-    const config = await this.loadPromptConfig();
+    // Always force refresh to get latest prompts from server
+    logger.info(`🎯 Getting question prompt for stage: ${stage}`);
+    const config = await this.loadPromptConfig(true);
     if (config?.data && config.data[stage as keyof typeof config.data]) {
-      return config.data[stage as keyof typeof config.data].question_prompt;
+      const prompt = config.data[stage as keyof typeof config.data].question_prompt;
+      logger.info(`✅ Loaded question prompt for ${stage}: ${prompt.substring(0, 100)}...`);
+      return prompt;
     }
 
     throw new Error(`No question prompt found for stage: ${stage}`);
   }
 
   /**
-   * Get stage introduction message (not available in new API format)
+   * Get stage introduction message - ONLY from server
    */
   async getStageIntroduction(stage: WellnessStage): Promise<string> {
-    // New API format doesn't have introductionMessage, use fallback
-    logger.warn(`Using fallback introduction for stage: ${stage} - not available in new API format`);
-    return this.getFallbackIntroduction(stage);
+    // Always force refresh to get latest prompts from server
+    const config = await this.loadPromptConfig(true);
+    if (config?.data && config.data[stage as keyof typeof config.data]) {
+      const stageData = config.data[stage as keyof typeof config.data] as any;
+      if (stageData.introduction_message) {
+        return stageData.introduction_message;
+      }
+    }
+    
+    throw new Error(`No introduction message found for stage: ${stage}`);
   }
 
-  /**
-   * Get required fields for stage completion (not available in new API format)
-   */
-  async getRequiredFields(stage: WellnessStage): Promise<string[]> {
-    // New API format doesn't have requiredFields, use fallback
-    logger.warn(`Using fallback required fields for stage: ${stage} - not available in new API format`);
-    return this.getFallbackRequiredFields(stage);
-  }
 
-  /**
-   * Clear cache (for testing or manual refresh)
-   */
-  clearCache(): void {
-    this.cache.clear();
-    this.lastFetchTime = 0;
-    this.lastSchemaFetchTime = 0;
-    logger.info('Prompt configuration and form schema cache cleared');
-  }
 
-  // Fallback methods (use local prompts if server unavailable)
-  
-  private getFallbackSystemPrompt(): string {
-    return `You are a wellness data analyst. Analyze conversation transcripts and user responses to extract structured health and wellness data.
-
-TASK:
-- Extract specific data from user response
-- Return result in exact JSON format  
-- Be conservative: if unsure about data - don't add it
-- Distinguish explicit data from assumptions
-
-RULES:
-1. Extract only data that user EXPLICITLY mentioned
-2. Don't invent or assume data
-3. Convert units to metric system (kg, cm, hours)
-4. For array lists - add only clearly named elements
-5. Return confidence from 0 to 100 based on data clarity
-
-RESPONSE FORMAT ALWAYS:
-{
-  "extractedData": { /* only WellnessData fields */ },
-  "confidence": 85,
-  "reasoning": "Explanation of what was extracted and from where",
-  "suggestedNextQuestion": "Logical next question",
-  "stageComplete": false
-}`;
-  }
-
-  private getFallbackStagePrompt(stage: WellnessStage): string {
-    const prompts: Record<WellnessStage, string> = {
-      'demographics_baseline': `STAGE 1: DEMOGRAPHICS AND BASELINE DATA
-
-Extract from user response the following fields:
-- age (number): age in years
-- gender (string): "male", "female", "non-binary"  
-- weight (number): weight in kilograms
-- height (number): height in centimeters
-- location (string): location/city
-- timezone (string): timezone
-
-Stage complete if has age, gender, and (weight OR height).`,
-
-      'biometrics_habits': `STAGE 2: BIOMETRICS AND HABITS
-
-Extract from user response:
-- sleep_duration (number): hours of sleep per night  
-- daily_steps (number): steps per day
-- resting_heart_rate (number): resting heart rate (bpm)
-- stress_level (string): "low", "moderate", "high"
-- nutrition_habits (array): eating habits
-- caffeine_intake (string): caffeine consumption
-
-Stage complete if has sleep_duration and 2 other fields.`,
-
-      'lifestyle_context': `STAGE 3: LIFESTYLE CONTEXT
-
-Extract from user response:
-- work_schedule (string): work schedule/type
-- workload (string): work load
-- business_travel (boolean): business travel
-- night_shifts (boolean): night shifts
-- family_obligations (array): family obligations
-- recovery_resources (array): recovery resources
-
-Stage complete if has work_schedule and 2 other fields.`,
-
-      'medical_history': `STAGE 4: MEDICAL HISTORY
-
-Extract from user response:
-- chronic_conditions (array): chronic conditions
-- injuries (array): injuries
-- medications (array): medications
-- supplements (array): supplements/vitamins
-- contraindications (array): contraindications
-
-IMPORTANT: Be especially careful with medical data.
-Stage complete if user provided medical info OR explicitly said no problems.`,
-
-      'goals_preferences': `STAGE 5: GOALS AND PREFERENCES
-
-Extract from user response:
-- health_goals (array): health goals
-- motivation_level (string): motivation level
-- morning_evening_type (string): "morning", "evening", "flexible"
-- activity_preferences (array): activity preferences
-- coaching_style_preference (string): coaching style
-- interests (array): interests
-
-Stage complete if has health_goals and activity_preferences.`,
-
-      'completed': '' // Not used but required for type completeness
-    };
-
-    return prompts[stage] || '';
-  }
-
-  private getFallbackIntroduction(stage: WellnessStage): string {
-    const intros: Record<WellnessStage, string> = {
-      'demographics_baseline': 'Let\'s get to know each other! 😊 Tell me about yourself - age, location, basic physical info (height, weight). This helps me understand you better.',
-      'biometrics_habits': 'Great! Now let\'s talk about your daily habits 📊 How much do you sleep? Physical activity, steps? Nutrition and general well-being?',
-      'lifestyle_context': 'Perfect! Now about your lifestyle 🏢 Tell me about work, schedule, family matters. What affects your day and how do you recover?',
-      'medical_history': 'Important topic - health 🏥 Any health issues, injuries, medications or limitations? If everything\'s fine - just say no problems.',
-      'goals_preferences': 'Final step - your goals! 🎯 What do you want to achieve? What activities do you like? Morning or evening person? What approach works for you?',
-      'completed': 'All done! 🎉'
-    };
-
-    return intros[stage] || 'Tell me more about yourself 😊';
-  }
-
-  private getFallbackRequiredFields(stage: WellnessStage): string[] {
-    const fields: Record<WellnessStage, string[]> = {
-      'demographics_baseline': ['age', 'gender'],
-      'biometrics_habits': ['sleep_duration'],  
-      'lifestyle_context': ['work_schedule'],
-      'medical_history': [],
-      'goals_preferences': ['health_goals'],
-      'completed': []
-    };
-
-    return fields[stage] || [];
-  }
 }
 
 export const promptConfigService = new PromptConfigService();

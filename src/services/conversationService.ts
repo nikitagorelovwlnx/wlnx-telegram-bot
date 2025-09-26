@@ -22,16 +22,10 @@ class EnhancedConversationService {
 
       // Add Anna's system prompt with character description
       const systemPrompt = await promptConfigService.getConversationSystemPrompt();
-
-      // Add persona prompt for Anna's character
-      const personaPrompt = await promptConfigService.getConversationPersonaPrompt();
-
-      // Combine system and persona prompts
-      const fullSystemPrompt = `${systemPrompt}\n\n${personaPrompt}`;
       
       messages.push({
         role: 'system',
-        content: fullSystemPrompt
+        content: systemPrompt
       });
 
       // Add conversation history

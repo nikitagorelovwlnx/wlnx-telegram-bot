@@ -1,6 +1,6 @@
 /**
- * Сервис для управления поэтапным сбором данных wellness формы
- * Использует ChatGPT для извлечения данных + загружает промпты с сервера
+ * Service for managing step-by-step wellness form data collection
+ * Uses ChatGPT for data extraction + loads prompts from server
  */
 
 import OpenAI from 'openai';
@@ -40,7 +40,7 @@ class WellnessStageService {
   }
 
   /**
-   * Инициализирует новый процесс сбора данных wellness формы
+   * Initialize new wellness form data collection process
    */
   initializeWellnessProcess(): WellnessStageProgress {
     const now = new Date().toISOString();
@@ -57,14 +57,14 @@ class WellnessStageService {
   }
 
   /**
-   * Получает приветственное сообщение для текущего этапа (из сервера)
+   * Get welcome message for current stage (from server)
    */
   async getStageIntroduction(stage: WellnessStage): Promise<string> {
     return await promptConfigService.getStageIntroduction(stage);
   }
 
   /**
-   * Обрабатывает ответ пользователя для текущего этапа
+   * Process user response for current stage
    */
   async processUserResponse(
     userResponse: string,
@@ -77,7 +77,7 @@ class WellnessStageService {
   }> {
     const stage = progress.currentStage;
     
-    // Добавляем сообщение в историю этапа
+    // Add message to stage history
     if (!progress.messageHistory[stage]) {
       progress.messageHistory[stage] = [];
     }
@@ -87,9 +87,9 @@ class WellnessStageService {
       timestamp: new Date().toISOString()
     });
 
-    // Всегда отправляем каждый ответ пользователя в ChatGPT для извлечения данных
+    // Always send each user response to ChatGPT for data extraction
 
-    // Отправляем в ChatGPT для извлечения данных
+    // Send to ChatGPT for data extraction
     const gptResult = await this.extractDataWithGPT({
       stage,
       userResponse,
@@ -102,13 +102,13 @@ class WellnessStageService {
       extractedData: gptResult.extractedData,
       extractionMethod: 'gpt_extraction',
       confidence: gptResult.confidence,
-      missingFields: await this.findMissingFields(gptResult.extractedData, stage),
+      missingFields: [], // No required fields logic needed
       extractionLog: gptResult.reasoning
     };
     
     progress.usedGPTForExtraction = true;
 
-    // Обновляем данные этапа
+    // Update stage data
     progress.stageData[stage] = {
       ...progress.stageData[stage],
       ...extractionResult.extractedData
@@ -116,13 +116,13 @@ class WellnessStageService {
     
     progress.lastActiveAt = new Date().toISOString();
 
-    // Проверяем, завершен ли этап
+    // Check if stage is complete
     const shouldAdvanceStage = await this.isStageComplete(stage, progress.stageData[stage] || {}, progress);
     
     let botResponse: string;
     
     if (shouldAdvanceStage) {
-      // Этап завершен - переходим к следующему
+      // Stage completed - move to next
       progress.completedStages.push(stage);
       const nextStage = STAGE_PROGRESSION[stage];
       
@@ -132,14 +132,14 @@ class WellnessStageService {
       } else {
         progress.currentStage = nextStage;
         
-        // Генерируем динамический вопрос для следующего этапа с учетом всего контекста
+        // Generate dynamic question for next stage with full context
         const conversationContext = this.buildConversationContext(progress);
         const nextQuestion = await this.generateQuestion(nextStage, conversationContext);
         
         botResponse = `Perfect! ⚅ Moving to the next section.\n\n${nextQuestion}`;
       }
     } else {
-      // Этап не завершен - генерируем дополнительный вопрос с контекстом
+      // Stage not complete - generate additional question with context
       const conversationContext = this.buildConversationContext(progress);
       botResponse = await this.generateQuestion(stage, conversationContext);
     }
@@ -153,18 +153,18 @@ class WellnessStageService {
   }
 
   /**
-   * Строит контекст всей беседы из прогресса wellness формы
+   * Build conversation context from wellness form progress
    */
   private buildConversationContext(progress: WellnessStageProgress): ConversationMessage[] {
     const context: ConversationMessage[] = [];
     
-    // Собираем сообщения из всех этапов в хронологическом порядке
+    // Collect messages from all stages in chronological order
     for (const stage of progress.completedStages) {
       const stageMessages = progress.messageHistory[stage] || [];
       context.push(...stageMessages);
     }
     
-    // Добавляем сообщения из текущего этапа
+    // Add messages from current stage
     const currentStageMessages = progress.messageHistory[progress.currentStage] || [];
     context.push(...currentStageMessages);
     
@@ -172,13 +172,14 @@ class WellnessStageService {
   }
 
   /**
-   * Генерация натурального вопроса для этапа с учетом контекста
+   * Generate natural question for stage with context
    */
   async generateQuestion(stage: WellnessStage, conversationContext: ConversationMessage[]): Promise<string> {
+    logger.info(`🎯 Generating question for stage: ${stage}`);
 
     let questionPrompt: string;
     try {
-      // Получаем question промпт с сервера для генерации вопроса
+      // Get question prompt from server for question generation
       questionPrompt = await promptConfigService.getQuestionPrompt(stage);
     } catch (serverError) {
       logger.error(`Failed to load question prompt for stage ${stage}:`, serverError);
@@ -189,7 +190,7 @@ class WellnessStageService {
     }
     
     // Get Anna's persona to maintain character consistency
-    const personaPrompt = await promptConfigService.getConversationPersonaPrompt();
+    const personaPrompt = await promptConfigService.getConversationSystemPrompt();
 
     // Combine question prompt with Anna's character
     const fullSystemPrompt = `${questionPrompt}\n\n${personaPrompt}\n\nAlways maintain Anna's caring, professional personality when asking questions.`;
@@ -199,7 +200,7 @@ class WellnessStageService {
         role: 'system', 
         content: fullSystemPrompt
       },
-      // Добавляем весь предыдущий контекст беседы
+      // Add all previous conversation context
       ...conversationContext.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'assistant',
         content: msg.content
@@ -241,13 +242,13 @@ class WellnessStageService {
   }
 
   /**
-   * Извлечение данных с помощью ChatGPT (использует удаленные промпты)
+   * Extract data using ChatGPT (uses remote prompts)
    */
   private async extractDataWithGPT(request: GPTExtractionRequest): Promise<GPTExtractionResponse> {
 
     let extractionPrompt: string;
     try {
-      // Получаем extraction промпт с сервера для извлечения данных
+      // Get extraction prompt from server for data extraction
       extractionPrompt = await promptConfigService.getExtractionPrompt(request.stage);
     } catch (serverError) {
       logger.error(`Failed to load extraction prompt for stage ${request.stage}:`, serverError);
@@ -273,7 +274,7 @@ class WellnessStageService {
         model: 'gpt-4',
         messages: messages as any,
         max_tokens: 1000,
-        temperature: 0.1 // Низкая температура для точности извлечения
+        temperature: 0.1 // Low temperature for extraction accuracy
       });
 
       const content = response.choices[0]?.message?.content;
@@ -281,7 +282,7 @@ class WellnessStageService {
         throw new Error('Empty response from OpenAI');
       }
 
-      // Парсим JSON ответ
+      // Parse JSON response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in GPT response');
@@ -289,7 +290,7 @@ class WellnessStageService {
 
       const gptResponse: GPTExtractionResponse = JSON.parse(jsonMatch[0]);
       
-      // Валидируем ответ
+      // Validate response
       if (!gptResponse.extractedData || typeof gptResponse.confidence !== 'number') {
         throw new Error('Invalid GPT response format');
       }
@@ -309,15 +310,15 @@ class WellnessStageService {
   }
 
   /**
-   * Проверяет, завершен ли этап на основе собранных данных
-   * ОГРАНИЧЕНИЕ: Максимум 2 вопроса на этап
+   * Check if stage is complete based on collected data
+   * LIMITATION: Maximum 2 questions per stage
    */
   private async isStageComplete(stage: WellnessStage, stageData: Partial<WellnessData>, progress: WellnessStageProgress): Promise<boolean> {
-    // Считаем количество вопросов в текущем этапе
+    // Count questions in current stage
     const currentStageMessages = progress.messageHistory[stage] || [];
     const userMessagesCount = currentStageMessages.filter(msg => msg.role === 'user').length;
     
-    // ЖЕСТКОЕ ОГРАНИЧЕНИЕ: Максимум 2 вопроса на этап
+    // HARD LIMIT: Maximum 2 questions per stage
     if (userMessagesCount >= 2) {
       logger.info(`🔄 Stage ${stage} completed: reached maximum 2 questions limit`, {
         userMessagesCount,
@@ -326,9 +327,9 @@ class WellnessStageService {
       return true;
     }
     
-    // Если есть хотя бы какие-то данные после первого вопроса, можно завершить этап
+    // If there's any data after first question, can complete stage
     if (userMessagesCount >= 1 && Object.keys(stageData).length > 0) {
-      logger.info(`🔄 Stage ${stage} completed: has data after 1 question`, {
+      logger.info(`Stage ${stage} completed: has data after 1 question`, {
         userMessagesCount,
         stageDataKeys: Object.keys(stageData)
       });
@@ -339,19 +340,7 @@ class WellnessStageService {
   }
 
   /**
-   * Находит недостающие поля для этапа
-   */
-  private async findMissingFields(data: Partial<WellnessData>, stage: WellnessStage): Promise<string[]> {
-    const requiredFields = await promptConfigService.getRequiredFields(stage);
-    
-    return requiredFields.filter(field => {
-      const value = (data as any)[field];
-      return value === undefined || value === null || value === '';
-    });
-  }
-
-  /**
-   * Генерирует дополнительный вопрос для неполного этапа
+   * Generate follow-up question for incomplete stage
    */
   private async generateFollowUpQuestion(
     stage: WellnessStage, 
@@ -359,14 +348,13 @@ class WellnessStageService {
     extractionResult: StageExtractionResult
   ): Promise<string> {
     const missingFields = extractionResult.missingFields;
-    
-    // Если есть информация - подтверждаем и спрашиваем недостающее
+    // If there's information - confirm and ask for missing
     const extractedFields = Object.keys(extractionResult.extractedData);
     let response = '';
     
     if (extractedFields.length > 0) {
       response += 'Got it! ';
-      // Показываем что поняли
+      // Show what we understood
       extractedFields.forEach(field => {
         const value = (extractionResult.extractedData as any)[field];
         response += this.formatFieldValue(field, value) + ' ';
@@ -374,7 +362,7 @@ class WellnessStageService {
       response += '\n\n';
     }
 
-    // Спрашиваем недостающие важные поля
+    // Ask for missing important fields
     if (missingFields.length > 0) {
       response += this.getMissingFieldQuestion(stage, missingFields[0]);
     } else {
@@ -440,12 +428,12 @@ class WellnessStageService {
       currentStage: progress.currentStage
     });
     
-    // Объединяем данные из всех этапов
+    // Combine data from all stages
     Object.values(progress.stageData).forEach(stageData => {
       Object.assign(finalData, stageData);
     });
 
-    // Рассчитываем BMI если есть вес и рост
+    // Calculate BMI if weight and height available
     if (finalData.weight && finalData.height) {
       const heightM = finalData.height / 100;
       finalData.bmi = Math.round((finalData.weight / (heightM * heightM)) * 10) / 10;

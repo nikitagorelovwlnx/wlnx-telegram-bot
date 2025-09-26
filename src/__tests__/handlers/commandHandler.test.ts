@@ -6,6 +6,7 @@ import { CommandHandler } from '../../handlers/commandHandler';
 import { userService } from '../../services/userService';
 import { conversationService } from '../../services/conversationService';
 import { apiService } from '../../services/apiService';
+import { wellnessStageService } from '../../services/wellnessStageService';
 import { Context } from 'telegraf';
 
 // Mock dependencies
@@ -13,10 +14,12 @@ jest.mock('../../services/userService');
 jest.mock('../../services/conversationService');
 jest.mock('../../services/apiService');
 jest.mock('../../utils/helpers');
+jest.mock('../../services/wellnessStageService');
 
 const mockUserService = userService as jest.Mocked<typeof userService>;
 const mockConversationService = conversationService as jest.Mocked<typeof conversationService>;
 const mockApiService = apiService as jest.Mocked<typeof apiService>;
+const mockWellnessStageService = wellnessStageService as jest.Mocked<typeof wellnessStageService>;
 
 // Mock context
 const createMockContext = (override: Partial<Context> = {}): Context => ({
@@ -169,7 +172,7 @@ describe('CommandHandler', () => {
           email: 'john@example.com',
           isAuthenticated: true,
           registrationStep: undefined,
-          wellnessProgress: expect.any(Object)
+          conversationActive: false
         })
       );
       
@@ -217,6 +220,169 @@ describe('CommandHandler', () => {
 
       // Should not do anything when no user
       expect(mockUserService.setUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleWellnessStageInput', () => {
+    beforeEach(() => {
+      // Setup wellnessStageService mocks
+      mockWellnessStageService.processUserResponse.mockResolvedValue({
+        extractionResult: {
+          stage: 'demographics_baseline',
+          extractedData: { age: 25 },
+          extractionMethod: 'gpt_extraction',
+          confidence: 85
+        },
+        updatedProgress: {
+          currentStage: 'demographics_baseline',
+          completedStages: [],
+          stageData: { demographics_baseline: { age: 25 } },
+          messageHistory: {}
+        },
+        botResponse: 'Thanks! What is your weight?',
+        shouldAdvanceStage: false
+      } as any);
+      
+      mockWellnessStageService.getFinalWellnessData.mockReturnValue({ age: 25, weight: null } as any);
+    });
+
+    it('should process wellness stage input successfully', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        email: 'john@example.com',
+        isAuthenticated: true,
+        wellnessProgress: {
+          currentStage: 'demographics_baseline',
+          completedStages: [],
+          stageData: {},
+          messageHistory: {}
+        }
+      } as any);
+
+      mockApiService.getWellnessInterviews.mockResolvedValue([{
+        id: 'interview-123',
+        user_id: 'john@example.com',
+        transcription: 'existing transcription',
+        summary: 'existing summary',
+        wellness_data: {}
+      }] as any);
+
+      mockApiService.updateWellnessInterview.mockResolvedValue({} as any);
+
+      await CommandHandler.handleWellnessStageInput(mockCtx, 'I am 25 years old');
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Thanks! What is your weight?');
+      expect(mockApiService.updateWellnessInterview).toHaveBeenCalled();
+    });
+
+    it('should handle user without wellness progress', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        email: 'john@example.com',
+        isAuthenticated: true
+        // No wellnessProgress
+      } as any);
+
+      await CommandHandler.handleWellnessStageInput(mockCtx, 'test input');
+
+      // Should show error message when no wellness progress
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        '❌ Ошибка состояния формы. Используйте /wellness_form чтобы начать.'
+      );
+    });
+
+    it('should handle API errors gracefully', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        email: 'john@example.com',
+        isAuthenticated: true,
+        wellnessProgress: {
+          currentStage: 'demographics_baseline',
+          completedStages: [],
+          stageData: {},
+          messageHistory: {}
+        }
+      } as any);
+
+      mockApiService.getWellnessInterviews.mockRejectedValue(new Error('API Error'));
+
+      await CommandHandler.handleWellnessStageInput(mockCtx, 'test input');
+
+      // Should still send bot response even if API fails
+      expect(mockCtx.reply).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleNaturalConversation', () => {
+    it('should handle natural conversation for authenticated users', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        email: 'john@example.com',
+        isAuthenticated: true,
+        conversationHistory: []
+      } as any);
+
+      mockConversationService.generateResponse.mockResolvedValue('Hello! How can I help you?');
+
+      await CommandHandler.handleNaturalConversation(mockCtx, 'Hello');
+
+      expect(mockConversationService.generateResponse).toHaveBeenCalled();
+      expect(mockCtx.reply).toHaveBeenCalledWith('Hello! How can I help you?');
+    });
+
+    it('should handle conversation service errors', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        email: 'john@example.com',
+        isAuthenticated: true,
+        conversationHistory: []
+      } as any);
+
+      mockConversationService.generateResponse.mockRejectedValue(new Error('OpenAI Error'));
+
+      await CommandHandler.handleNaturalConversation(mockCtx, 'Hello');
+
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('having some technical difficulties')
+      );
+    });
+
+    it('should return early for unauthenticated users', async () => {
+      mockUserService.getUser.mockReturnValue({
+        telegramId: '123456789',
+        firstName: 'John',
+        isAuthenticated: false
+      } as any);
+
+      await CommandHandler.handleNaturalConversation(mockCtx, 'Hello');
+
+      expect(mockConversationService.generateResponse).not.toHaveBeenCalled();
+      expect(mockCtx.reply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('error handling', () => {
+    it('should handle errors in start command', async () => {
+      mockUserService.setUser.mockImplementation(() => {
+        throw new Error('Database error');
+      });
+
+      // Should not throw
+      await expect(CommandHandler.start(mockCtx)).resolves.not.toThrow();
+    });
+
+    it('should handle errors in registration flow', async () => {
+      mockUserService.getUser.mockImplementation(() => {
+        throw new Error('Service error');
+      });
+
+      // Should not throw
+      await expect(CommandHandler.handleRegistrationFlow(mockCtx, 'test')).resolves.not.toThrow();
     });
   });
 });
