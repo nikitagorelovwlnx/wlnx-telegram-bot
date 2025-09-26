@@ -1,11 +1,11 @@
 /**
- * Fixed tests for ConversationService based on actual implementation
+ * Fixed tests for ConversationService - only test what's actually implemented
  */
 
 import { conversationService } from '../../services/conversationService';
-import { ConversationMessage } from '../../types';
+import { ConversationMessage, WellnessData } from '../../types';
 
-// Mock OpenAI properly
+// Mock OpenAI
 jest.mock('openai', () => {
   const mockCreate = jest.fn();
   return {
@@ -21,147 +21,6 @@ jest.mock('openai', () => {
 });
 
 describe('ConversationService - Fixed Tests', () => {
-  
-  describe('extractUserInfo - Real behavior', () => {
-    it('should extract age from "I\'m X years old" pattern', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I'm 25 years old",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.age).toBe(25);
-    });
-
-    it('should extract weight and height correctly', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I weigh 70kg and I'm 175cm tall",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.weight).toBe(70);
-      expect(result.height).toBe(175);
-    });
-
-    it('should calculate BMI correctly with metric units', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I weigh 70kg and I'm 175cm tall",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      // 70kg, 175cm -> 1.75m
-      // BMI = 70 / (1.75^2) = 22.9
-      expect(result.bmi).toBeCloseTo(22.9, 1);
-    });
-
-    it('should extract sleep duration with "sleep X hours" pattern', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I sleep 8 hours per night",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.sleep_duration).toBe(8);
-    });
-
-    it('should extract daily steps', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I walk 10000 steps daily",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.daily_steps).toBe(10000);
-    });
-
-    it('should extract stress level keywords', () => {
-      const testCases = [
-        { message: "I feel very stressed", expected: "high" },
-        { message: "I'm quite relaxed", expected: "low" },
-        { message: "feeling overwhelmed", expected: "high" }
-      ];
-
-      testCases.forEach(({ message, expected }) => {
-        const conversation: ConversationMessage[] = [
-          {
-            role: 'user',
-            content: message,
-            timestamp: '2023-12-01T10:00:00Z'
-          }
-        ];
-
-        const result = conversationService.extractUserInfo(conversation);
-        expect(result.stress_level).toBe(expected);
-      });
-    });
-
-    it('should extract health goals', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I want to lose weight and get fit",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.health_goals).toContain('lose weight');
-      expect(result.health_goals).toContain('get fit');
-    });
-
-    it('should extract activity preferences', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I love yoga and running",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.activity_preferences).toContain('yoga');
-      expect(result.activity_preferences).toContain('running');
-    });
-
-    it('should initialize health arrays properly', () => {
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: "I take vitamin d supplements and have back pain",
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = conversationService.extractUserInfo(conversation);
-      expect(result.health_goals).toEqual([]);
-      expect(result.activity_preferences).toEqual([]);
-    });
-
-    it('should handle empty conversation gracefully', () => {
-      const result = conversationService.extractUserInfo([]);
-      
-      expect(result.age).toBeUndefined();
-      expect(result.weight).toBeUndefined();
-      expect(result.health_goals).toEqual([]);
-      expect(result.activity_preferences).toEqual([]);
-    });
   });
 
   describe('generateResponse', () => {

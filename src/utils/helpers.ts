@@ -54,9 +54,12 @@ export function handleError(ctx: Context, error: any, userMessage: string = 'Som
     stack: error.stack,
   });
 
-  ctx.reply(userMessage).catch((replyError) => {
-    logger.error('Failed to send error message', { replyError });
-  });
+  const replyResult = ctx.reply(userMessage);
+  if (replyResult && typeof replyResult.catch === 'function') {
+    replyResult.catch((replyError) => {
+      logger.error('Failed to send error message', { replyError });
+    });
+  }
 }
 
 export function validateEmail(email: string): boolean {
