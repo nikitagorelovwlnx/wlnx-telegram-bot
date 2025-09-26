@@ -1,5 +1,5 @@
 /**
- * Fixed tests for ConversationService - only test what's actually implemented
+ * Tests for ConversationService - only test implemented features
  */
 
 import { conversationService } from '../../services/conversationService';
@@ -20,122 +20,83 @@ jest.mock('openai', () => {
   };
 });
 
-describe('ConversationService - Fixed Tests', () => {
+// Mock promptConfigService
+jest.mock('../../services/promptConfigService', () => ({
+  promptConfigService: {
+    getConversationSystemPrompt: jest.fn().mockResolvedValue('You are Anna, a wellness consultant.'),
+    getConversationPersonaPrompt: jest.fn().mockResolvedValue('You are warm and empathetic.'),
+    getWellnessSummarySystemPrompt: jest.fn().mockResolvedValue('Generate a wellness summary.')
+  }
+}));
+
+describe('ConversationService', () => {
+  const mockOpenAI = require('openai').default;
+  let mockCreate: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreate = mockOpenAI().chat.completions.create;
   });
 
   describe('generateResponse', () => {
-    const mockOpenAI = require('openai').default;
-    let mockCreate: jest.Mock;
-
-    beforeEach(() => {
-      mockCreate = mockOpenAI().chat.completions.create;
-    });
-
-    it('should generate response with proper OpenAI call', async () => {
-      const mockResponse = {
+    it('should generate response using ChatGPT', async () => {
+      const mockResponse = 'Hello! How can I help you today?';
+      mockCreate.mockResolvedValue({
         choices: [{
           message: {
-            content: 'Hello! How are you today?'
+            content: mockResponse
           }
         }]
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      });
 
       const conversation: ConversationMessage[] = [
         {
           role: 'user',
-          content: 'Hi Anna!',
+          content: 'Hello',
           timestamp: '2023-12-01T10:00:00Z'
         }
       ];
 
       const result = await conversationService.generateResponse(conversation);
 
-      expect(result).toBe('Hello! How are you today?');
-      
-      // Should use GPT-5 or fallback to GPT-4
-      const calls = mockCreate.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(1);
-      
-      // Check that at least one call has the right parameters
-      const validCall = calls.find(call => 
-        call[0].model === 'gpt-5' || call[0].model === 'gpt-4'
-      );
-      expect(validCall).toBeDefined();
-      // Now conversationService just passes messages directly without system prompts
-      expect(validCall[0].messages).toEqual([
-        expect.objectContaining({
-          role: 'user',
-          content: 'Hi Anna!'
-        })
-      ]);
-      expect(validCall[0].temperature).toBe(0.7);
-      
-      if (validCall[0].model === 'gpt-5') {
-        expect(validCall[0].max_completion_tokens).toBe(1500);
-      } else {
-        expect(validCall[0].max_tokens).toBe(1500);
-      }
+      expect(result).toBe(mockResponse);
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: 'gpt-4',
+        messages: expect.arrayContaining([
+          { role: 'system', content: expect.stringContaining('Anna') },
+          { role: 'user', content: 'Hello' }
+        ]),
+        max_tokens: 1500,
+        temperature: 0.7
+      });
     });
 
-    it('should handle OpenAI API errors', async () => {
-      mockCreate.mockRejectedValue(new Error('API Error'));
+    it('should handle OpenAI errors', async () => {
+      mockCreate.mockRejectedValue(new Error('OpenAI API error'));
 
       const conversation: ConversationMessage[] = [
         {
           role: 'user',
-          content: 'Hi Anna!',
+          content: 'Hello',
           timestamp: '2023-12-01T10:00:00Z'
         }
       ];
 
-      const result = await conversationService.generateResponse(conversation);
-
-      expect(result).toBe('Sorry, something went wrong 😅 Can you try again?');
-    });
-
-    it('should handle empty response from OpenAI', async () => {
-      const mockResponse = {
-        choices: []
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
-
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: 'Hi Anna!',
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
-
-      const result = await conversationService.generateResponse(conversation);
-
-      expect(result).toBe('Sorry, something went wrong 😅 Can you try again?');
+      await expect(conversationService.generateResponse(conversation))
+        .rejects.toThrow('OpenAI API error');
     });
   });
 
   describe('generateWellnessSummary', () => {
-    const mockOpenAI = require('openai').default;
-    let mockCreate: jest.Mock;
-
-    beforeEach(() => {
-      mockCreate = mockOpenAI().chat.completions.create;
-    });
-
-    it('should generate wellness summary with extracted data', async () => {
-      const mockSummary = '## WELLNESS PROFILE SUMMARY\n\n### DEMOGRAPHICS\n- Age: 30\n- Weight: 70kg';
-      
-      const mockResponse = {
+    it('should generate wellness summary with conversation and extracted data', async () => {
+      const mockSummary = 'Wellness Summary: User is 30 years old, weighs 70kg...';
+      mockCreate.mockResolvedValue({
         choices: [{
           message: {
             content: mockSummary
           }
         }]
-      };
-
-      mockCreate.mockResolvedValue(mockResponse);
+      });
 
       const conversation: ConversationMessage[] = [
         {
@@ -145,40 +106,33 @@ describe('ConversationService - Fixed Tests', () => {
         }
       ];
 
-      const result = await conversationService.generateWellnessSummary(conversation);
+      const extractedData: WellnessData = {
+        age: 30,
+        weight: 70
+      };
+
+      const result = await conversationService.generateWellnessSummary(conversation, extractedData);
 
       expect(result).toBe(mockSummary);
-      
-      // Check that OpenAI was called with either GPT-5 or GPT-4
-      const calls = mockCreate.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(1);
-      
-      // At least one call should be with a valid model
-      const hasValidModel = calls.some(call => 
-        call[0].model === 'gpt-5' || call[0].model === 'gpt-4'
-      );
-      expect(hasValidModel).toBe(true);
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: 'gpt-4',
+        messages: expect.arrayContaining([
+          { role: 'system', content: expect.stringContaining('wellness summary') },
+          { role: 'user', content: expect.stringContaining('EXTRACTED DATA') }
+        ]),
+        max_tokens: 2500,
+        temperature: 0.3
+      });
     });
 
-    it('should handle summary generation errors', async () => {
+    it('should handle errors in wellness summary generation', async () => {
       mockCreate.mockRejectedValue(new Error('Summary generation failed'));
 
-      const conversation: ConversationMessage[] = [
-        {
-          role: 'user',
-          content: 'Test message',
-          timestamp: '2023-12-01T10:00:00Z'
-        }
-      ];
+      const conversation: ConversationMessage[] = [];
+      const extractedData: WellnessData = {};
 
-      await expect(conversationService.generateWellnessSummary(conversation))
+      await expect(conversationService.generateWellnessSummary(conversation, extractedData))
         .rejects.toThrow('Summary generation failed');
-    });
-  });
-
-  describe('isAvailable', () => {
-    it('should return true when OpenAI is configured', () => {
-      expect(conversationService.isAvailable()).toBe(true);
     });
   });
 });

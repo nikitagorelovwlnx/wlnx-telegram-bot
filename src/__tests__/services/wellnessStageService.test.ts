@@ -12,7 +12,8 @@ jest.mock('../../services/promptConfigService', () => ({
     getExtractionPrompt: jest.fn().mockResolvedValue('Extract demographic data from user response in JSON format.'),
     getQuestionPrompt: jest.fn().mockResolvedValue('Ask about user demographics like age, gender, weight, height.'),
     getStageIntroduction: jest.fn().mockResolvedValue('Tell me about yourself - age, gender, and basic info.'),
-    getRequiredFields: jest.fn().mockResolvedValue(['age', 'gender'])
+    getRequiredFields: jest.fn().mockResolvedValue(['age', 'gender']),
+    getConversationPersonaPrompt: jest.fn().mockResolvedValue('You are Anna, a warm and empathetic wellness consultant.')
   }
 }));
 
@@ -140,15 +141,10 @@ describe('WellnessStageService', () => {
       expect(finalData.height).toBe(180);
       expect(finalData.sleep_duration).toBe(8);
       expect(finalData.daily_steps).toBe(10000);
-      
       // BMI должен рассчитаться автоматически
       expect(finalData.bmi).toBeCloseTo(23.1, 1);
     });
   });
 
-  describe('isAvailable', () => {
-    it('should return true when OpenAI is configured', () => {
-      expect(wellnessStageService.isAvailable()).toBe(true);
-    });
-  });
+  // Note: isAvailable method was removed - service is always available when OpenAI key is configured
 });
