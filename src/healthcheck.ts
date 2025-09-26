@@ -170,7 +170,7 @@ class HealthCheckService {
 
       // Try to make a simple health check request to API server
       try {
-        const response = await fetch(`${config.apiBaseUrl}/health`);
+        const response = await fetch(`${config.apiBaseUrl.replace('/api', '')}/health`);
         const responseTime = Date.now() - startTime;
         
         if (response.ok) {

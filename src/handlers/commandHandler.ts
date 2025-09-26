@@ -311,9 +311,9 @@ export class CommandHandler {
       try {
         const { apiService } = await import('../services/apiService');
         
-        // Extract structured wellness data
-        const wellnessData = conversationService.extractUserInfo(conversationHistory);
-        logger.info('Manual save - Extracted wellness data:', {
+        // Get wellness data from user's extracted info (if available)
+        const wellnessData = user.extractedUserInfo || {};
+        logger.info('Manual save - Using wellness data:', {
           extractedFields: Object.keys(wellnessData).filter(key => {
             const value = (wellnessData as any)[key];
             return value !== undefined && value !== null && value !== '';
@@ -321,8 +321,8 @@ export class CommandHandler {
           wellnessData: wellnessData
         });
         
-        // Generate comprehensive wellness summary (now uses extracted data internally)
-        const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+        // Generate comprehensive wellness summary
+        const wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory, wellnessData);
         
         // Create transcription from conversation history
         const transcription = conversationHistory
@@ -396,10 +396,7 @@ export class CommandHandler {
       const user = userService.getUser(userInfo.id.toString());
       const { conversationService } = await import('../services/conversationService');
 
-      if (!conversationService.isAvailable()) {
-        await ctx.reply('Sorry, I\'m having connection issues right now 😔 Try later');
-        return;
-      }
+      // conversationService is always available now (no fallbacks)
 
       // Get conversation history
       let conversationHistory = user?.conversationHistory || [];
@@ -430,12 +427,9 @@ export class CommandHandler {
       conversationHistory.push(aiMessage);
 
       // Extract user info from conversation (single call)
-      const extractedInfo = conversationService.extractUserInfo(conversationHistory);
-
-      // Update user with new conversation history and extracted info
+      // Update user with new conversation history (extraction happens in wellness stages)
       userService.setUser(userInfo.id.toString(), {
-        conversationHistory: conversationHistory,
-        extractedUserInfo: extractedInfo
+        conversationHistory: conversationHistory
       });
 
       // Auto-save/update transcription after every exchange for real-time client display
@@ -443,9 +437,9 @@ export class CommandHandler {
         try {
           const { apiService } = await import('../services/apiService');
           
-          // Use the same extracted data for wellness_data
-          const wellnessData = extractedInfo;
-          logger.info('Extracted wellness data before summary generation:', {
+          // Use wellness data from user's extracted info (if available)
+          const wellnessData = user?.extractedUserInfo || {};
+          logger.info('Using wellness data for auto-save:', {
             extractedFields: Object.keys(wellnessData).filter(key => {
               const value = (wellnessData as any)[key];
               return value !== undefined && value !== null && value !== '';
@@ -456,7 +450,7 @@ export class CommandHandler {
           // ⚡ ОПТИМИЗАЦИЯ: генерируем summary только для длинных разговоров
           let wellnessSummary = 'Ongoing conversation - summary will be generated after more exchanges';
           if (conversationHistory.length >= 10) { // Генерируем summary только после 10+ сообщений
-            wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory);
+            wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory, wellnessData);
           }
           
           // Create transcription from conversation history
@@ -579,8 +573,7 @@ export class CommandHandler {
       logUserAction(ctx, 'natural_conversation', {
         messageLength: text.length,
         responseLength: response.length,
-        extractedAge: extractedInfo.age,
-        extractedLocation: extractedInfo.location
+        hasWellnessData: !!(user?.extractedUserInfo && Object.keys(user.extractedUserInfo).length > 0)
       });
 
     } catch (error) {
@@ -618,6 +611,7 @@ export class CommandHandler {
           
           // Complete registration and start wellness data collection
           const { wellnessStageService } = await import('../services/wellnessStageService');
+          const { apiService } = await import('../services/apiService');
           
           // Initialize wellness data collection process
           const wellnessProgress = wellnessStageService.initializeWellnessProcess();
@@ -629,6 +623,28 @@ export class CommandHandler {
             wellnessProgress,
             conversationActive: false // Disable normal conversation during wellness collection
           });
+
+          // 🆕 CREATE WELLNESS SESSION IMMEDIATELY after registration
+          try {
+            logger.info('🆕 Creating wellness interview session for user:', { email: text });
+            
+            const initialTranscription = `[SYSTEM] User registered: ${userInfo.firstName || 'Unknown'} (${text})`;
+            
+            const newInterview = await apiService.createWellnessInterview(text, {
+              transcription: initialTranscription,
+              summary: 'Wellness interview session started',
+              wellness_data: {}
+            });
+            
+            logger.info('✅ Wellness session created successfully:', { 
+              interviewId: newInterview.id,
+              email: text 
+            });
+            
+          } catch (sessionError) {
+            logger.error('❌ Failed to create wellness session:', sessionError);
+            // Continue anyway - session will be created on first save attempt
+          }
 
           // Generate first wellness question using ChatGPT
           const firstQuestion = await wellnessStageService.generateQuestion(
@@ -679,6 +695,86 @@ export class CommandHandler {
 
       // Отправляем ответ бота
       await ctx.reply(result.botResponse);
+
+      // 🔄 UPDATE TRANSCRIPTION after each wellness exchange
+      if (user?.email) {
+        try {
+          const { apiService } = await import('../services/apiService');
+          
+          // Build FULL transcription from ALL stages and messages
+          const allMessages: Array<{role: string, content: string}> = [];
+          
+          // Add registration info
+          allMessages.push({
+            role: 'system',
+            content: `User registered: ${userInfo.firstName || 'Unknown'} (${user.email})`
+          });
+          
+          // Add messages from ALL stages in order
+          const stageOrder: Array<keyof typeof result.updatedProgress.messageHistory> = [
+            'demographics_baseline', 'biometrics_habits', 'lifestyle_context', 
+            'medical_history', 'goals_preferences'
+          ];
+          
+          for (const stage of stageOrder) {
+            const stageMessages = result.updatedProgress.messageHistory[stage] || [];
+            allMessages.push(...stageMessages);
+          }
+          
+          // Create full conversation transcript with clear sender markers
+          const fullTranscription = allMessages
+            .map(msg => {
+              if (msg.role === 'system') return `[SYSTEM] ${msg.content}`;
+              if (msg.role === 'user') return `[USER] ${msg.content}`;
+              return `[ASSISTANT] ${msg.content}`;
+            })
+            .join('\n\n');
+          
+          // Get current wellness data
+          const currentWellnessData = wellnessStageService.getFinalWellnessData(result.updatedProgress);
+          
+          logger.info('🔄 Updating wellness session transcription:', { 
+            email: user.email,
+            stage: result.updatedProgress.currentStage,
+            totalMessages: allMessages.length,
+            transcriptionLength: fullTranscription.length
+          });
+          
+          // Update existing session
+          const interviews = await apiService.getWellnessInterviews(user.email);
+          logger.info('📋 Found interviews for update:', { 
+            email: user.email, 
+            interviewCount: interviews.length,
+            interviewIds: interviews.map(i => i.id)
+          });
+          
+          if (interviews.length > 0) {
+            logger.info('🔄 Attempting to update interview:', { 
+              interviewId: interviews[0].id,
+              transcriptionLength: fullTranscription.length,
+              wellnessDataKeys: Object.keys(currentWellnessData)
+            });
+            
+            await apiService.updateWellnessInterview(user.email, interviews[0].id, {
+              transcription: fullTranscription,
+              summary: `Wellness interview in progress - Stage: ${result.updatedProgress.currentStage}`,
+              wellness_data: currentWellnessData
+            });
+            
+            logger.info('✅ Wellness session updated successfully');
+          } else {
+            logger.warn('⚠️ No interviews found to update for email:', user.email);
+          }
+          
+        } catch (updateError) {
+          logger.error('❌ Failed to update wellness session:', {
+            error: updateError instanceof Error ? updateError.message : String(updateError),
+            stack: updateError instanceof Error ? updateError.stack : undefined,
+            email: user?.email,
+            stage: result.updatedProgress.currentStage
+          });
+        }
+      }
 
       // Если форма завершена, возвращаемся к обычному разговору
       if (result.updatedProgress.currentStage === 'completed') {

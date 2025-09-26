@@ -93,7 +93,7 @@ class PromptConfigService {
         
         let response: Response;
         try {
-          response = await fetch(`${config.apiBaseUrl}/api/prompts`, {
+          response = await fetch(`${config.apiBaseUrl}/prompts`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',

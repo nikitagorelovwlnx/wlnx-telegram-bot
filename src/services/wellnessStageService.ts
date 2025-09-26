@@ -211,6 +211,13 @@ class WellnessStageService {
     ];
 
     try {
+      logger.info('🤖 Sending to ChatGPT for question generation:', {
+        stage,
+        systemPromptLength: fullSystemPrompt.length,
+        conversationContextLength: conversationContext.length,
+        messagesCount: messages.length
+      });
+
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4',
         messages: messages as any,
@@ -218,7 +225,15 @@ class WellnessStageService {
         temperature: 0.7
       });
 
-      return response.choices[0]?.message?.content || 'Tell me more about yourself.';
+      const generatedQuestion = response.choices[0]?.message?.content || 'Tell me more about yourself.';
+      
+      logger.info('✅ ChatGPT generated question:', {
+        stage,
+        questionLength: generatedQuestion.length,
+        questionPreview: generatedQuestion.substring(0, 100) + '...'
+      });
+
+      return generatedQuestion;
     } catch (error) {
       logger.error('Error generating question:', error);
       throw error;

@@ -242,7 +242,7 @@ class ApiService {
     const response: AxiosResponse<WellnessInterview[]> = await this.api.get('/interviews', {
       params: { email }
     });
-    return (response.data as any).result || response.data;
+    return (response.data as any).results || (response.data as any).result || response.data;
   }
 
   async updateWellnessInterview(
