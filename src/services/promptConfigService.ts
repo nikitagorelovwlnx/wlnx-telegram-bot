@@ -81,6 +81,35 @@ class PromptConfigService {
   }
 
   /**
+   * Validate prompt content to ensure it meets quality standards
+   */
+  private validatePromptContent(prompt: string): boolean {
+    // Check for inappropriate content
+    const inappropriatePatterns = [
+      /putin/i,
+      /russian president/i,
+      /russia/i,
+      /kremlin/i,
+      // Add more patterns as needed
+    ];
+    
+    for (const pattern of inappropriatePatterns) {
+      if (pattern.test(prompt)) {
+        logger.warn(`Prompt contains inappropriate content: ${pattern}`);
+        return false;
+      }
+    }
+    
+    // Check minimum length
+    if (prompt.length < 50) {
+      logger.warn('Prompt too short');
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
    * Load prompt configuration from server with retry logic
    */
   async loadPromptConfig(forceRefresh: boolean = false): Promise<PromptsResponse | null> {
@@ -127,7 +156,7 @@ class PromptConfigService {
           throw new Error('Invalid prompts response format from server');
         }
         
-        // Validate all required stages are present
+        // Validate all required stages are present and content is appropriate
         const requiredStages: WellnessStage[] = [
           'demographics_baseline',
           'biometrics_habits', 
@@ -140,6 +169,17 @@ class PromptConfigService {
           const stageData = (data.data as any)[stage];
           if (!stageData || !stageData.question_prompt || !stageData.extraction_prompt) {
             throw new Error(`Missing or invalid prompts for stage: ${stage}`);
+          }
+          
+          // Validate prompt content
+          if (!this.validatePromptContent(stageData.question_prompt)) {
+            logger.error(`Invalid question prompt content for stage ${stage}, rejecting server prompts`);
+            throw new Error(`Server prompts contain inappropriate content for stage: ${stage}`);
+          }
+          
+          if (!this.validatePromptContent(stageData.extraction_prompt)) {
+            logger.error(`Invalid extraction prompt content for stage ${stage}, rejecting server prompts`);
+            throw new Error(`Server prompts contain inappropriate content for stage: ${stage}`);
           }
         }
         
@@ -297,6 +337,7 @@ class PromptConfigService {
     
     // Always force refresh to get latest prompts from server
     logger.info(`🎯 Getting question prompt for stage: ${stage}`);
+    logger.info(`🔄 About to force refresh prompts from server for stage: ${stage}`);
     const config = await this.loadPromptConfig(true);
     if (config?.data && config.data[stage as keyof typeof config.data]) {
       const prompt = config.data[stage as keyof typeof config.data].question_prompt;

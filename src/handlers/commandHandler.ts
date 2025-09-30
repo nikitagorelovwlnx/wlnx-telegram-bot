@@ -431,13 +431,13 @@ export class CommandHandler {
       };
       conversationHistory.push(userMessage);
 
-      // ⏰ Показываем, что бот "печатает"
+      // Show bot is typing
       await ctx.sendChatAction('typing');
 
       // Generate AI response
       const response = await conversationService.generateResponse(conversationHistory);
 
-      // ⚡ БЫСТРЫЙ ОТВЕТ - сразу отвечаем пользователю!
+      // Send response immediately
       await ctx.reply(response);
 
       // Add AI response to history
@@ -469,9 +469,9 @@ export class CommandHandler {
             wellnessData: wellnessData
           });
           
-          // ⚡ ОПТИМИЗАЦИЯ: генерируем summary только для длинных разговоров
+          // OPTIMIZATION: generate summary only for long conversations
           let wellnessSummary = 'Ongoing conversation - summary will be generated after more exchanges';
-          if (conversationHistory.length >= 10) { // Генерируем summary только после 10+ сообщений
+          if (conversationHistory.length >= 10) { // Generate summary only after 10+ messages
             wellnessSummary = await conversationService.generateWellnessSummary(conversationHistory, wellnessData);
           }
           
@@ -669,16 +669,21 @@ export class CommandHandler {
           }
 
           // Generate first wellness question using ChatGPT
+          logger.info('🚀 About to call generateQuestion for first wellness question', {
+            stage: wellnessProgress.currentStage,
+            email: text
+          });
           const firstQuestion = await wellnessStageService.generateQuestion(
             wellnessProgress.currentStage, 
             [] // No previous context for first question
           );
+          logger.info('✅ Generated first wellness question', {
+            questionLength: firstQuestion.length,
+            questionPreview: firstQuestion.substring(0, 100)
+          });
           
-          await ctx.reply(
-            `Perfect! Now we know each other 🎉\n\n` +
-            `I'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n` +
-            `**Stage 1/5: Demographics & Baseline**\n\n${firstQuestion}`
-          );
+          // Send only the generated question from server prompts - no hardcoded text
+          await ctx.reply(firstQuestion);
           break;
       }
 
@@ -690,7 +695,7 @@ export class CommandHandler {
 
 
   /**
-   * Обрабатывает ввод пользователя в рамках wellness формы по этапам
+   * Handle user input within wellness form stages
    */
   static async handleWellnessStageInput(ctx: Context, text: string): Promise<void> {
     try {
@@ -698,24 +703,24 @@ export class CommandHandler {
       const user = userService.getUser(userInfo.id.toString());
 
       if (!user?.wellnessProgress) {
-        await ctx.reply('❌ Ошибка состояния формы. Используйте /wellness_form чтобы начать.');
+        await ctx.reply('❌ Form state error. Please start over.');
         return;
       }
 
       const { wellnessStageService } = await import('../services/wellnessStageService');
 
-      // Показываем что бот обрабатывает ответ
+      // Show bot is processing response
       await ctx.sendChatAction('typing');
 
-      // Обрабатываем ответ пользователя через ChatGPT
+      // Process user response through ChatGPT
       const result = await wellnessStageService.processUserResponse(text, user.wellnessProgress);
       
-      // Обновляем данные пользователя
+      // Update user data
       userService.setUser(userInfo.id.toString(), { 
         wellnessProgress: result.updatedProgress 
       });
 
-      // Отправляем ответ бота
+      // Send bot response
       await ctx.reply(result.botResponse);
 
       // 🔄 UPDATE TRANSCRIPTION after each wellness exchange
@@ -748,10 +753,7 @@ export class CommandHandler {
           
           if (user.email) {
             conversationFlow.push({ role: 'user', content: user.email });
-            conversationFlow.push({ 
-              role: 'assistant', 
-              content: "Perfect! Now we know each other 🎉\n\nI'd like to learn more about you to provide better wellness advice. This will take just a few minutes.\n\n**Stage 1/5: Demographics & Baseline**" 
-            });
+            // No hardcoded assistant message - only actual generated responses
           }
           
           // 2. Add wellness stage messages in chronological order
@@ -824,22 +826,18 @@ export class CommandHandler {
         }
       }
 
-      // Если форма завершена, возвращаемся к обычному разговору
+      // If form completed, return to normal conversation
       if (result.updatedProgress.currentStage === 'completed') {
         const finalData = wellnessStageService.getFinalWellnessData(result.updatedProgress);
         
-        // Сохраняем финальные данные
+        // Save final data
         userService.setUser(userInfo.id.toString(), { 
           extractedUserInfo: finalData,
-          conversationActive: true // Возвращаем обычный разговор
+          conversationActive: true // Return to normal conversation
         });
 
-        setTimeout(async () => {
-          await ctx.reply(
-            '🎉 Отлично! Теперь у меня есть вся необходимая информация для персональных рекомендаций.\n\n' +
-            'Можете продолжить обычное общение или использовать /save_interview для сохранения данных на сервер.'
-          );
-        }, 1000);
+        // Completion message is now generated by wellnessStageService using server prompts
+        // No hardcoded messages allowed
       }
 
       logUserAction(ctx, 'wellness_stage_input', { 
@@ -849,7 +847,7 @@ export class CommandHandler {
       });
 
     } catch (error) {
-      handleError(ctx, error, 'Ошибка при обработке ответа формы');
+      handleError(ctx, error, 'Error processing form response');
     }
   }
 }

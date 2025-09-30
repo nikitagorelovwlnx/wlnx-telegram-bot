@@ -128,15 +128,15 @@ class WellnessStageService {
       
       if (nextStage === 'completed') {
         progress.currentStage = 'completed';
-        botResponse = 'Great! I have all the information I need. Now I can give you personalized wellness recommendations! 🎉';
+        // Generate completion message using ChatGPT with server prompts
+        const conversationContext = this.buildConversationContext(progress);
+        botResponse = await this.generateCompletionMessage(conversationContext);
       } else {
         progress.currentStage = nextStage;
         
         // Generate dynamic question for next stage with full context
         const conversationContext = this.buildConversationContext(progress);
-        const nextQuestion = await this.generateQuestion(nextStage, conversationContext);
-        
-        botResponse = `Perfect! ⚅ Moving to the next section.\n\n${nextQuestion}`;
+        botResponse = await this.generateQuestion(nextStage, conversationContext);
       }
     } else {
       // Stage not complete - generate additional question with context
@@ -172,10 +172,60 @@ class WellnessStageService {
   }
 
   /**
+   * Generate completion message when all stages are done
+   */
+  async generateCompletionMessage(conversationContext: ConversationMessage[]): Promise<string> {
+    logger.info('🎯 Generating completion message');
+
+    // Use conversation system prompt for completion message
+    const systemPrompt = await promptConfigService.getConversationSystemPrompt();
+
+    const messages = [
+      { 
+        role: 'system', 
+        content: `${systemPrompt}\n\nThe user has completed all wellness form stages. Generate a warm, congratulatory message that thanks them and explains what happens next. Be encouraging and mention that you now have enough information to provide personalized wellness recommendations.`
+      },
+      // Add all conversation context
+      ...conversationContext.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: 'I have completed all the wellness form stages. What happens next?'
+      }
+    ];
+
+    try {
+      logger.info('🤖 Sending to ChatGPT for completion message generation');
+      
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: messages as any,
+        max_tokens: 300,
+        temperature: 0.7
+      });
+
+      const completionMessage = response.choices[0]?.message?.content || 'Thank you for completing the wellness form!';
+      
+      logger.info('✅ ChatGPT generated completion message:', {
+        messageLength: completionMessage.length,
+        messagePreview: completionMessage.substring(0, 100) + '...'
+      });
+
+      return completionMessage;
+    } catch (error) {
+      logger.error('Error generating completion message:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Generate natural question for stage with context
    */
   async generateQuestion(stage: WellnessStage, conversationContext: ConversationMessage[]): Promise<string> {
     logger.info(`🎯 Generating question for stage: ${stage}`);
+    logger.info(`📝 About to load question prompt from server for stage: ${stage}`);
 
     let questionPrompt: string;
     try {
@@ -189,11 +239,12 @@ class WellnessStageService {
       );
     }
     
-    // Get Anna's persona to maintain character consistency
+    // Get Anna's persona first, then override with server prompt
+    // This way server prompt (Putin) overrides Anna's personality
     const personaPrompt = await promptConfigService.getConversationSystemPrompt();
-
-    // Combine question prompt with Anna's character
-    const fullSystemPrompt = `${questionPrompt}\n\n${personaPrompt}\n\nAlways maintain Anna's caring, professional personality when asking questions.`;
+    
+    // Put Anna first, then server prompt to override
+    const fullSystemPrompt = `${personaPrompt}\n\n${questionPrompt}`;
 
     const messages = [
       { 
@@ -210,13 +261,15 @@ class WellnessStageService {
         content: 'Generate next natural question for this wellness stage based on our conversation context.'
       }
     ];
+    ];
 
     try {
       logger.info('🤖 Sending to ChatGPT for question generation:', {
         stage,
         systemPromptLength: fullSystemPrompt.length,
         conversationContextLength: conversationContext.length,
-        messagesCount: messages.length
+        messagesCount: messages.length,
+        fullSystemPrompt: fullSystemPrompt // DEBUG: show full prompt
       });
 
       const response = await this.openai.chat.completions.create({
